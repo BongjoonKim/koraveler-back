@@ -1,16 +1,14 @@
 package server.koraveler.common.dto;
 
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.*;
 import org.springframework.data.annotation.Id;
 
 import java.time.LocalDateTime;
 
-@Data
-@AllArgsConstructor
-@NoArgsConstructor
+@Getter
+@Setter
+//@AllArgsConstructor
+//@NoArgsConstructor
 public class Info {
     @Id
     private String id;
