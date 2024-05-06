@@ -1,8 +1,10 @@
 package server.koraveler.users.service.UsersServiceImpl;
 
+import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.stereotype.Service;
+import server.koraveler.users.dto.UsersDTO;
 import server.koraveler.users.model.Users;
 import server.koraveler.users.repo.UsersRepo;
 import server.koraveler.users.service.UsersService;
@@ -19,16 +21,24 @@ public class UsersServiceImpl implements UsersService {
     private UsersRepo userRepo;
 
     @Override
-    public Users createUser(Users user) {
+    public UsersDTO createUser(Users user) throws Exception {
         try {
-            Users newUser = new Users();
-            newUser.setTitle("dddddd");
+            Users users = userRepo.save(user);
+            UsersDTO usersDTO = new UsersDTO();
+            BeanUtils.copyProperties(users, usersDTO);
+            return usersDTO;
+        } catch (Exception e) {
+            throw e;
+        }
+    }
 
-            Map<String, String> data = new HashMap<>();
-//            data.put("title", "케케");
-            userRepo.save(newUser);
-            return null;
-//            return userRepo.insert(newUser);
+    @Override
+    public UsersDTO getUser(String email) throws Exception {
+        try {
+            Users users = userRepo.findByEmail(email).get(0);
+            UsersDTO usersDTO = new UsersDTO();
+            BeanUtils.copyProperties(users, usersDTO);
+            return usersDTO;
         } catch (Exception e) {
             throw e;
         }

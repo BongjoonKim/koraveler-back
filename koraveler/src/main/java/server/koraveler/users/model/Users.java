@@ -3,7 +3,7 @@ package server.koraveler.users.model;
 import lombok.*;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
-import server.koraveler.common.dto.Info;
+import server.koraveler.common.dto.common;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -14,13 +14,14 @@ import java.util.List;
 @AllArgsConstructor
 @NoArgsConstructor
 @Builder
-public class Users {
+public class Users extends common {
     @Id
     private String id;
-    private String title;
-//    private String email;
-//    private String password;
-//    private List<String> roles = new ArrayList<>();
+    private String userId;
+    private String userPassword;
+    private String email;
+    private String password;
+    private List<String> roles = new ArrayList<>();
 //    private List<? extends GrantedAuthority> authorities;
 //    public Collection<? extends GrantedAuthority> getAuthorities() {
 //        return this.roles.stream()
