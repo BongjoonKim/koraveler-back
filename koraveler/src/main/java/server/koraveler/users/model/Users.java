@@ -3,7 +3,7 @@ package server.koraveler.users.model;
 import lombok.*;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
-import server.koraveler.common.dto.common;
+import server.koraveler.common.dto.Common;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -14,7 +14,7 @@ import java.util.List;
 @AllArgsConstructor
 @NoArgsConstructor
 @Builder
-public class Users extends common {
+public class Users extends Common {
     @Id
     private String id;
     private String userId;

@@ -5,13 +5,15 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.Id;
-import server.koraveler.common.dto.common;
+import org.springframework.data.mongodb.core.mapping.Document;
+import server.koraveler.common.dto.Common;
 
+@Document(collection = "menus")
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
 @Builder
-public class Menus extends common {
+public class Menus extends Common {
     @Id
     private String id;
     private String label;

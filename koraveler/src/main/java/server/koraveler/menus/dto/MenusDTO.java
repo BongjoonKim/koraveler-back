@@ -1,9 +1,9 @@
 package server.koraveler.menus.dto;
 
 import lombok.Data;
-import server.koraveler.common.dto.common;
+import server.koraveler.menus.model.Menus;
 
 @Data
-public class MenusDTO extends common {
+public class MenusDTO extends Menus {
 
 }

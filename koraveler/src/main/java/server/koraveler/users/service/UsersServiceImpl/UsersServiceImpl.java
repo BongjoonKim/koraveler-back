@@ -15,8 +15,8 @@ import java.util.Map;
 @Service
 public class UsersServiceImpl implements UsersService {
 
-    @Autowired
-    MongoTemplate mongoTemplate;
+//    @Autowired
+//    MongoTemplate mongoTemplate;
     @Autowired
     private UsersRepo userRepo;
 

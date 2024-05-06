@@ -9,9 +9,7 @@ import java.time.LocalDateTime;
 @Setter
 //@AllArgsConstructor
 //@NoArgsConstructor
-public class common {
-    @Id
-    private String id;
+public class Common {
     private LocalDateTime created;
     private LocalDateTime updated;
     private boolean isNonExpired;
