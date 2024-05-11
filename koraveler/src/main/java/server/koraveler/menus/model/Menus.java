@@ -8,6 +8,8 @@ import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 import server.koraveler.common.dto.Common;
 
+import java.util.List;
+
 @Document(collection = "menus")
 @Data
 @AllArgsConstructor
@@ -20,5 +22,6 @@ public class Menus extends Common {
     private String value;
     private int sequence;
     private String url;
+    private List<String> types;
 
 }
