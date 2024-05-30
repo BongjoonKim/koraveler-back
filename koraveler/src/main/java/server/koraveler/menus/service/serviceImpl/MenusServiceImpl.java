@@ -96,7 +96,8 @@ public class MenusServiceImpl implements MenusService {
                 throw new ResponseStatusException(HttpStatus.valueOf("none"), "Please we need label name");
             }
             // 이미 존재하는 라벨이 있는지 확인
-            if (menusRepo.findByLabel(menusDTO.getLabel()) != null) {
+            Menus findMenus = menusRepo.findByLabel(menusDTO.getLabel());
+            if (findMenus != null && !findMenus.getId().equals(menusDTO.getId())) {
                 throw new ResponseStatusException(HttpStatus.valueOf("duplicated"), "Duplicated label exists");
             }
 

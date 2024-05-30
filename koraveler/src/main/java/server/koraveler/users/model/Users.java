@@ -21,6 +21,7 @@ public class Users extends Common {
     private String userPassword;
     private String email;
     private String password;
+    private String src;
     private List<String> roles = new ArrayList<>();
 //    private List<? extends GrantedAuthority> authorities;
 //    public Collection<? extends GrantedAuthority> getAuthorities() {

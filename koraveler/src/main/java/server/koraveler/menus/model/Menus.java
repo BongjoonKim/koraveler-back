@@ -10,7 +10,6 @@ import server.koraveler.common.dto.Common;
 
 import java.util.List;
 
-@Document(collection = "menus")
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
