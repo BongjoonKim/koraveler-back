@@ -23,11 +23,14 @@ public class LoginServiceImpl implements LoginService {
 
     private UsersDTO findOrCreateUser(UsersDTO usersDTO) {
         // 새로운 사용자 생성
+        Users users = findUserByUserId(usersDTO.getUserId());
         if (findUserByUserId(usersDTO.getUserId()) == null) {
             Users newUsers = new Users();
-            BeanUtils.copyProperties(usersDTO, newUsers);
 
-            
+            // TODO 사용자 생성 로직 추가
+
+            BeanUtils.copyProperties(usersDTO, newUsers);
+            userRepo.save(newUsers);
         } else {    // 기존 사용자 불러오기
 
         }
