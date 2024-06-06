@@ -9,7 +9,7 @@ import server.koraveler.users.dto.UsersDTO;
 import server.koraveler.users.service.LoginService;
 
 @RestController
-@RequestMapping("login")
+@RequestMapping("/login")
 @RequiredArgsConstructor
 @Slf4j
 public class LoginController {
@@ -17,10 +17,12 @@ public class LoginController {
     @Autowired
     private LoginService loginService;
 
-    @PostMapping('')
+    @PostMapping("")
     public ResponseEntity<UsersDTO> login(
             @RequestBody UsersDTO usersDTO) {
         UsersDTO usersDTO1 = loginService.login(usersDTO);
-        
+        return ResponseEntity.ok(
+                loginService.login(usersDTO)
+        );
     }
 }

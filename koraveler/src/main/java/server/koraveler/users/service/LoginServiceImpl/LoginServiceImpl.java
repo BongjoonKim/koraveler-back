@@ -2,37 +2,54 @@ package server.koraveler.users.service.LoginServiceImpl;
 
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.util.NullableUtils;
 import org.springframework.stereotype.Service;
+import org.springframework.util.ObjectUtils;
+import org.springframework.util.StringUtils;
 import server.koraveler.users.dto.UsersDTO;
 import server.koraveler.users.model.Users;
 import server.koraveler.users.repo.UsersRepo;
 import server.koraveler.users.service.LoginService;
 
+import java.time.LocalDateTime;
+
 @Service
 public class LoginServiceImpl implements LoginService {
     @Autowired
-    private UsersRepo userRepo;
+    private UsersRepo usersRepo;
     @Override
     public UsersDTO login(UsersDTO usersDTO) {
         // 사용자 비번 암호화 후 저장
+        Users users = findUserByUserId(usersDTO.getUserId());
+
+        if (ObjectUtils.isEmpty(users)) {
+            createUser(usersDTO);
+        }
+        return null;
     }
 
     private Users findUserByUserId(String userId) {
-        return userRepo.findByUserId(userId).get(0);
+        return usersRepo.findByUserId(userId).get(0);
     }
 
-    private UsersDTO findOrCreateUser(UsersDTO usersDTO) {
-        // 새로운 사용자 생성
-        Users users = findUserByUserId(usersDTO.getUserId());
-        if (findUserByUserId(usersDTO.getUserId()) == null) {
-            Users newUsers = new Users();
+    private UsersDTO createUser(UsersDTO usersDTO) {
+        LocalDateTime now = LocalDateTime.now();
+        Users users = new Users();
 
-            // TODO 사용자 생성 로직 추가
+        BeanUtils.copyProperties(usersDTO, users);
 
-            BeanUtils.copyProperties(usersDTO, newUsers);
-            userRepo.save(newUsers);
-        } else {    // 기존 사용자 불러오기
+        users.setCreated(now);
+        users.setUpdated(now);
+        users.setEnabled(true);
 
+        try {
+            usersRepo.save(users);
+        } catch (Exception e) {
+            throw e;
         }
+
+        UsersDTO newUsersDTO = new UsersDTO();
+        BeanUtils.copyProperties(users,newUsersDTO);
+        return newUsersDTO;
     }
 }
