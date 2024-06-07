@@ -17,10 +17,9 @@ public class LoginController {
     @Autowired
     private LoginService loginService;
 
-    @PostMapping("")
+    @PostMapping("/security")
     public ResponseEntity<UsersDTO> login(
             @RequestBody UsersDTO usersDTO) {
-        UsersDTO usersDTO1 = loginService.login(usersDTO);
         return ResponseEntity.ok(
                 loginService.login(usersDTO)
         );
