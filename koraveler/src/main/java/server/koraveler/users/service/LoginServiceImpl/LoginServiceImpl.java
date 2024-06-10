@@ -26,7 +26,7 @@ public class LoginServiceImpl implements LoginService {
     @Override
     public UsersDTO login(UsersDTO usersDTO) {
         // 사용자 비번 암호화 후 저장
-        List<Users> users = findUserByUserId(usersDTO.getUserId());
+        Users users = findUserByUserId(usersDTO.getUserId());
 
         if (ObjectUtils.isEmpty(users)) {
             createUser(usersDTO);
@@ -34,7 +34,7 @@ public class LoginServiceImpl implements LoginService {
         return null;
     }
 
-    private List<Users> findUserByUserId(String userId) {
+    private Users findUserByUserId(String userId) {
         return usersRepo.findByUserId(userId);
     }
 
