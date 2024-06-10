@@ -10,6 +10,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 import server.koraveler.config.AuthenticationRequest;
 import server.koraveler.config.AuthenticationResponse;
@@ -39,6 +40,9 @@ public class LoginController {
     @Autowired
     private LoginService loginService;
 
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+
     @PostMapping("")
     public ResponseEntity<?> createAuthenticationToken(@RequestBody AuthenticationRequest authenticationRequest) throws Exception {
         try {
@@ -46,6 +50,7 @@ public class LoginController {
                     authenticationRequest.getUsername(),
                     authenticationRequest.getPassword()
             );
+            System.out.println("authenticationToken = " + passwordEncoder.encode(authenticationRequest.getPassword()));
             authenticationManager.authenticate(authenticationToken);
 //            System.out.println("authenticationToken = " + authenticationToken);
 //            System.out.println("authentication = " + authentication);
