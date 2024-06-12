@@ -9,6 +9,7 @@ import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
@@ -51,20 +52,20 @@ public class LoginController {
                     authenticationRequest.getPassword()
             );
             System.out.println("authenticationToken = " + passwordEncoder.encode(authenticationRequest.getPassword()));
-            authenticationManager.authenticate(authenticationToken);
-//            System.out.println("authenticationToken = " + authenticationToken);
-//            System.out.println("authentication = " + authentication);
-//            authenticationManager.authenticate(
-//                    new UsernamePasswordAuthenticationToken(authenticationRequest.getUsername(), authenticationRequest.getPassword())
-//            );
+            Authentication authentication = authenticationManager.authenticate(authenticationToken);
+            System.out.println("authentication = " + authentication);
+//            SecurityContextHolder.getContext().setAuthentication(authentication);
+
+//            final UserDetails userDetails = customUserDetailService
+//                    .loadUserByUsername(authenticationRequest.getUsername());
+//
+//            final String token = jwtTokenUtil.generateToken(userDetails);
+
+            return ResponseEntity.ok(null);
+
         } catch (BadCredentialsException e) {
             throw new Exception("Incorrect username or password", e);
         }
-
-        final UserDetails userDetails = customUserDetailService.loadUserByUsername(authenticationRequest.getUsername());
-        final String jwt = jwtUtil.generateToken(userDetails);
-
-        return ResponseEntity.ok(new AuthenticationResponse(jwt));
     }
 
     @PostMapping("/security")
