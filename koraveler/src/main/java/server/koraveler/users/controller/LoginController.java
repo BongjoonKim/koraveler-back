@@ -29,7 +29,7 @@ import java.util.List;
 @RequestMapping("/login")
 @RequiredArgsConstructor
 @Slf4j
-public class LoginController {
+public class LoginController{
     @Autowired
     private AuthenticationManager authenticationManager;
 
@@ -44,29 +44,29 @@ public class LoginController {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
-    @PostMapping("")
-    public ResponseEntity<?> createAuthenticationToken(@RequestBody AuthenticationRequest authenticationRequest) throws Exception {
-        try {
-            UsernamePasswordAuthenticationToken authenticationToken = new UsernamePasswordAuthenticationToken(
-                    authenticationRequest.getUsername(),
-                    authenticationRequest.getPassword()
-            );
-            System.out.println("authenticationToken = " + passwordEncoder.encode(authenticationRequest.getPassword()));
-            Authentication authentication = authenticationManager.authenticate(authenticationToken);
-            System.out.println("authentication = " + authentication);
-//            SecurityContextHolder.getContext().setAuthentication(authentication);
-
-//            final UserDetails userDetails = customUserDetailService
-//                    .loadUserByUsername(authenticationRequest.getUsername());
+//    @PostMapping("")
+//    public ResponseEntity<?> createAuthenticationToken(@RequestBody AuthenticationRequest authenticationRequest) throws Exception {
+//        try {
+//            UsernamePasswordAuthenticationToken authenticationToken = new UsernamePasswordAuthenticationToken(
+//                    authenticationRequest.getUsername(),
+//                    authenticationRequest.getPassword()
+//            );
+//            System.out.println("authenticationToken = " + passwordEncoder.encode(authenticationRequest.getPassword()));
+//            Authentication authentication = authenticationManager.authenticate(authenticationToken);
+//            System.out.println("authentication = " + authentication);
+////            SecurityContextHolder.getContext().setAuthentication(authentication);
 //
-//            final String token = jwtTokenUtil.generateToken(userDetails);
-
-            return ResponseEntity.ok(null);
-
-        } catch (BadCredentialsException e) {
-            throw new Exception("Incorrect username or password", e);
-        }
-    }
+////            final UserDetails userDetails = customUserDetailService
+////                    .loadUserByUsername(authenticationRequest.getUsername());
+////
+////            final String token = jwtTokenUtil.generateToken(userDetails);
+//
+//            return ResponseEntity.ok(null);
+//
+//        } catch (BadCredentialsException e) {
+//            throw new Exception("Incorrect username or password", e);
+//        }
+//    }
 
     @PostMapping("/security")
     public ResponseEntity<UsersDTO> login(

@@ -25,7 +25,6 @@ public class CustomUserDetailService implements UserDetailsService {
         if (users == null) {
             throw new UsernameNotFoundException("User not found");
         }
-//        users.setUserPassword("$2a$10$NIESYHuITY43C.ks9xhPsuAX9GGACcFgEdLjmEISKvBf4VAzWhN2m");
         return User.builder()
                 .username(users.getUserId())
                 .password(users.getUserPassword()).build();
