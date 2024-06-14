@@ -36,8 +36,8 @@ public class LoginController{
     @Autowired
     private JwtUtil jwtUtil;
 
-    @Autowired
-    private CustomUserDetailService customUserDetailService;
+//    @Autowired
+//    private CustomUserDetailService customUserDetailService;
     @Autowired
     private LoginService loginService;
 
