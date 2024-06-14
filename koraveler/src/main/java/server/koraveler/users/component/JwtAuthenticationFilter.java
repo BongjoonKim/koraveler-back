@@ -1,8 +1,7 @@
 package server.koraveler.users.component;
 
-import com.auth0.jwt.exceptions.JWTVerificationException;
-import com.auth0.jwt.interfaces.DecodedJWT;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.ExpiredJwtException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -50,7 +49,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         if (requestTokenHeader != null && requestTokenHeader.startsWith("Bearer ")) {
             jwtToken = requestTokenHeader.substring(7);
             try {
-                DecodedJWT decodedJWT = JwtUtil.verifyToken(jwtToken);
+                Claims decodedJWT = JwtUtil.verifyToken(jwtToken);
                 username = decodedJWT.getSubject();
                 System.out.println("decodedJWT = " + decodedJWT);
             } catch (IllegalArgumentException e) {
