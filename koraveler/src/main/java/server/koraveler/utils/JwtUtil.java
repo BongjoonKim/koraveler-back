@@ -1,9 +1,6 @@
 package server.koraveler.utils;
 
-import io.jsonwebtoken.Claims;
-import io.jsonwebtoken.Jws;
-import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.SignatureAlgorithm;
+import io.jsonwebtoken.*;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -50,10 +47,17 @@ public class JwtUtil {
     }
 
     public static Claims verifyToken(String token) {
-        Jws<Claims> claimsJws = Jwts.parserBuilder()
-                .setSigningKey(SECRET_KEY).build()
-                .parseClaimsJws(token);
-        return claimsJws.getBody();
+        try {
+            Jws<Claims> claimsJws = Jwts.parserBuilder()
+                    .setSigningKey(SECRET_KEY).build()
+                    .parseClaimsJws(token);
+            return claimsJws.getBody();
+        } catch (ExpiredJwtException e) {
+            throw new RuntimeException("Token expired", e);
+        } catch (Exception e) {
+            throw new RuntimeException("Invalid token", e);
+        }
+
     }
 
     // 토큰에서 만료 날짜를 가져오는 메서드

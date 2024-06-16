@@ -12,6 +12,8 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.oauth2.client.OAuth2AuthorizedClientService;
+import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.web.bind.annotation.*;
 import server.koraveler.config.AuthenticationRequest;
 import server.koraveler.config.AuthenticationResponse;
@@ -36,8 +38,8 @@ public class LoginController{
     @Autowired
     private JwtUtil jwtUtil;
 
-//    @Autowired
-//    private CustomUserDetailService customUserDetailService;
+    @Autowired
+    private OAuth2AuthorizedClientService authorizedClientService;
     @Autowired
     private LoginService loginService;
 
@@ -68,9 +70,18 @@ public class LoginController{
 //        }
 //    }
 
-    @PostMapping("/security")
-    public ResponseEntity<UsersDTO> login(
-            @RequestBody UsersDTO usersDTO) {
+
+    @PostMapping("/refresh")
+    public ResponseEntity<?> refreshToken(
+            OAuth2AuthenticationToken auth2AuthenticationToken
+    ) {
+        // refresh token 검증
+
+        // refresh token도 만료되었을 때, 재로그인 화면으로
+
+        //
+        String username = auth
+
         return ResponseEntity.ok(
                 loginService.login(usersDTO)
         );
