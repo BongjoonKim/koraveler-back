@@ -53,7 +53,7 @@ public class SecurityConfig {
 //        customAuthenticationFilter.setFilterProcessesUrl("/login"); // Optional: Set custom login URL
 
         http
-                .csrf(AbstractHttpConfigurer::disable)
+                .csrf(csrf -> csrf.disable())
                 .formLogin(AbstractHttpConfigurer::disable)
             .authorizeHttpRequests(req -> req
                 .requestMatchers("/login").permitAll()

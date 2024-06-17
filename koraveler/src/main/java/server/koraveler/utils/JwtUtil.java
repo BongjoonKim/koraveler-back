@@ -17,7 +17,7 @@ import java.util.function.Function;
 public class JwtUtil {
     private static final byte[] SECRET_KEY = "harieshariesharieshaireshariesha".getBytes();
     private static final long ACCESS_TOKEN_EXPIRY = 10 * 60 * 1000; // 60 minutes
-    private static final long REFRESH_TOKEN_EXPIRY = 30 * 24 * 60 * 60 * 1000; // 30 days
+    private static final long REFRESH_TOKEN_EXPIRY = 30 * 24 * 10 * 60 * 1000; // 30 days
     private static final SignatureAlgorithm algorithm = SignatureAlgorithm.HS256;
 
     public static String generateAccessToken(String username) {
@@ -43,10 +43,15 @@ public class JwtUtil {
                 .setExpiration(new Date(System.currentTimeMillis() + REFRESH_TOKEN_EXPIRY))
                 .signWith(algorithm, SECRET_KEY)
                 .compact();
+        Jws<Claims> claimsJws = Jwts.parserBuilder()
+                .setSigningKey(SECRET_KEY)
+                .build()
+                .parseClaimsJws(token);
+        System.out.println("body access" + claimsJws.getBody());
         return token;
     }
 
-    public static Claims verifyToken(String token) {
+    public static Claims verifyToken(String token) throws RuntimeException, Exception {
         try {
             Jws<Claims> claimsJws = Jwts.parserBuilder()
                     .setSigningKey(SECRET_KEY).build()

@@ -6,7 +6,5 @@ import server.koraveler.users.dto.UsersDTO;
 public interface LoginService {
     public UsersDTO login(UsersDTO usersDTO);
 
-    public TokenDTO refreshToken(String refreshToken) {
-
-    }
+    public TokenDTO refreshToken(String refreshToken) throws Exception;
 }
