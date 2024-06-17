@@ -15,6 +15,16 @@ public class UsersController {
     @Autowired
     private UsersService userService;
 
+    @GetMapping("")
+    public ResponseEntity<UsersDTO> getUserFromAccessToken() {
+        try {
+            return ResponseEntity.ok(userService.getUserFromAccessToken());
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.ofNullable(null);
+        }
+    }
+
     @GetMapping("/account")
     public ResponseEntity<UsersDTO> getUser(@RequestParam("email") String email) {
         try {

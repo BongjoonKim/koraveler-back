@@ -3,8 +3,13 @@ package server.koraveler.users.service.UsersServiceImpl;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.util.ObjectUtils;
+import server.koraveler.users.dto.CustomUserDetails;
 import server.koraveler.users.dto.UsersDTO;
 import server.koraveler.users.model.Users;
 import server.koraveler.users.repo.UsersRepo;
@@ -47,5 +52,21 @@ public class UsersServiceImpl implements UsersService {
         } catch (Exception e) {
             throw e;
         }
+    }
+
+    @Override
+    public UsersDTO getUserFromAccessToken() throws Exception {
+        UsersDTO usersDTO = new UsersDTO();
+
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        UserDetails userData = (UserDetails) authentication.getPrincipal();
+        System.out.println("userData = " + userData);
+        if (!ObjectUtils.isEmpty(userData.getUsername())) {
+            Users users = userRepo.findByUserId(userData.getUsername());
+            System.out.println("users = " + users);
+
+            BeanUtils.copyProperties(users, usersDTO);
+        }
+        return usersDTO;
     }
 }
