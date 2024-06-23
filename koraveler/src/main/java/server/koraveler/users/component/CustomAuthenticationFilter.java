@@ -47,10 +47,10 @@ public class CustomAuthenticationFilter extends UsernamePasswordAuthenticationFi
         super.setAuthenticationManager(authenticationManager);
     }
 
-//    public CustomAuthenticationFilter(AuthenticationManager authenticationManager) {
-//        this.authenticationManager = authenticationManager;
-//        setFilterProcessesUrl("/login"); // Set custom login URL if needed
-//    }
+    public CustomAuthenticationFilter(AuthenticationManager authenticationManager) {
+        this.authenticationManager = authenticationManager;
+        setFilterProcessesUrl("/ps/login"); // Set custom login URL if needed
+    }
 
     @Override
     public Authentication attemptAuthentication(HttpServletRequest request, HttpServletResponse response)

@@ -16,7 +16,7 @@ import java.util.function.Function;
 @Component
 public class JwtUtil {
     private static final byte[] SECRET_KEY = "harieshariesharieshaireshariesha".getBytes();
-    private static final long ACCESS_TOKEN_EXPIRY = 10 * 60 * 1000; // 60 minutes
+    private static final long ACCESS_TOKEN_EXPIRY = 1 * 60 * 1000; // 60 minutes
     private static final long REFRESH_TOKEN_EXPIRY = 30 * 24 * 10 * 60 * 1000; // 30 days
     private static final SignatureAlgorithm algorithm = SignatureAlgorithm.HS256;
 

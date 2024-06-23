@@ -56,17 +56,26 @@ public class UsersServiceImpl implements UsersService {
 
     @Override
     public UsersDTO getUserFromAccessToken() throws Exception {
-        UsersDTO usersDTO = new UsersDTO();
+        try {
+            UsersDTO usersDTO = new UsersDTO();
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            Object principal = authentication.getPrincipal();
+            if (principal != null && (principal instanceof UserDetails)) {
+                UserDetails userData = (UserDetails) principal;
+                if (!ObjectUtils.isEmpty(userData.getUsername())) {
+                    Users users = userRepo.findByUserId(userData.getUsername());
+                    System.out.println("users = " + users);
 
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        UserDetails userData = (UserDetails) authentication.getPrincipal();
-        System.out.println("userData = " + userData);
-        if (!ObjectUtils.isEmpty(userData.getUsername())) {
-            Users users = userRepo.findByUserId(userData.getUsername());
-            System.out.println("users = " + users);
-
-            BeanUtils.copyProperties(users, usersDTO);
+                    BeanUtils.copyProperties(users, usersDTO);
+                }
+                return usersDTO;
+            } else {
+                return null;
+            }
+        } catch (Exception e) {
+            throw e;
         }
-        return usersDTO;
     }
+
+
 }

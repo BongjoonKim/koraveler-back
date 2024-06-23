@@ -9,7 +9,7 @@ import server.koraveler.users.model.Users;
 import server.koraveler.users.service.UsersService;
 
 @RestController
-@RequestMapping("/user")
+@RequestMapping("ps/user")
 @Slf4j
 public class UsersController {
     @Autowired

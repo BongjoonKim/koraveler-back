@@ -1,8 +1,11 @@
 package server.koraveler.users.controller;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -17,19 +20,18 @@ import org.springframework.security.oauth2.client.OAuth2AuthorizedClientService;
 import org.springframework.web.bind.annotation.*;
 import server.koraveler.config.AuthenticationRequest;
 import server.koraveler.config.AuthenticationResponse;
+import server.koraveler.error.CustomException;
+import server.koraveler.error.ErrorResponse;
 import server.koraveler.users.dto.TokenDTO;
 import server.koraveler.users.dto.UsersDTO;
 import server.koraveler.users.service.CustomUserDetailsServiceImpl.CustomUserDetailService;
 import server.koraveler.users.service.LoginService;
 import server.koraveler.utils.JwtUtil;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.List;
+import java.util.*;
 
 @RestController
-@RequestMapping("/login")
+@RequestMapping("ps/login")
 @RequiredArgsConstructor
 @Slf4j
 public class LoginController{
@@ -45,39 +47,24 @@ public class LoginController{
     @Autowired
     private PasswordEncoder passwordEncoder;
 
-//    @PostMapping("")
-//    public ResponseEntity<?> createAuthenticationToken(@RequestBody AuthenticationRequest authenticationRequest) throws Exception {
-//        try {
-//            UsernamePasswordAuthenticationToken authenticationToken = new UsernamePasswordAuthenticationToken(
-//                    authenticationRequest.getUsername(),
-//                    authenticationRequest.getPassword()
-//            );
-//            System.out.println("authenticationToken = " + passwordEncoder.encode(authenticationRequest.getPassword()));
-//            Authentication authentication = authenticationManager.authenticate(authenticationToken);
-//            System.out.println("authentication = " + authentication);
-////            SecurityContextHolder.getContext().setAuthentication(authentication);
-//
-////            final UserDetails userDetails = customUserDetailService
-////                    .loadUserByUsername(authenticationRequest.getUsername());
-////
-////            final String token = jwtTokenUtil.generateToken(userDetails);
-//
-//            return ResponseEntity.ok(null);
-//
-//        } catch (BadCredentialsException e) {
-//            throw new Exception("Incorrect username or password", e);
-//        }
-//    }
-
-
     @PostMapping("/refresh")
     public ResponseEntity<?> refreshToken(
-            @RequestBody TokenDTO tokenDTO
+            @RequestBody HashMap<String, String> data
             ) {
         try {
-            return ResponseEntity.ok(loginService.refreshToken(tokenDTO.getRefreshToken()));
+            return ResponseEntity.ok(loginService.refreshToken(data.get("refreshToken")));
+        } catch (CustomException e) {
+            return new ResponseEntity<>(new CustomException(e.getStatus(), e.getMsg()), e.getStatus());
+        }
+    }
+
+    @GetMapping("/user")
+    public ResponseEntity<?> getLoginUser(
+    ) {
+        try {
+            return ResponseEntity.ok(loginService.loginUser());
         } catch (Exception e) {
-            return ResponseEntity.status(401).body(e);
+            return new ResponseEntity<>("ssssss", HttpStatus.UNAUTHORIZED);
         }
     }
 }

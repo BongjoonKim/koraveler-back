@@ -5,10 +5,14 @@ import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.util.NullableUtils;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.util.ObjectUtils;
 import org.springframework.util.StringUtils;
+import server.koraveler.users.dto.CustomUserDetails;
 import server.koraveler.users.dto.TokenDTO;
 import server.koraveler.users.dto.UsersDTO;
 import server.koraveler.users.model.Users;
@@ -63,14 +67,14 @@ public class LoginServiceImpl implements LoginService {
         return newUsersDTO;
     }
 
-
+    // refresh token verify, access token 재생성
     @Override
     public TokenDTO refreshToken(String refreshToken) throws RuntimeException, Exception {
         TokenDTO tokenDTO = new TokenDTO();
         try {
             Claims claims = JwtUtil.verifyToken(refreshToken);
-
-            if(claims.getSubject().isEmpty()) {
+            System.out.println("claims = " + claims.getSubject().isEmpty());
+            if(!claims.getSubject().isEmpty()) {
                 String userId = claims.getSubject();
                 String newAccessToken  = JwtUtil.generateAccessToken(userId);
 
@@ -82,15 +86,15 @@ public class LoginServiceImpl implements LoginService {
         } catch (RuntimeException e) {
             String message = e.getMessage();
             if (message.contains("Token expired")) {
-                // 리프레시 토큰이 만료된 경우
-                Claims claims = JwtUtil.verifyToken(refreshToken);
-                TokenDTO newToken = new TokenDTO();
-                String username = claims.getSubject();
-                String newAccessToken = JwtUtil.generateAccessToken(username);
-                String newRefreshToken = JwtUtil.generateRefreshToken(username);
-                newToken.setAccessToken(newAccessToken);
-                newToken.setRefreshToken(newRefreshToken);
-                return newToken;
+                // 리프레시 토큰이 만료된 경우 재로그인 시켜야함
+//                Claims claims = JwtUtil.verifyToken(refreshToken);
+//                TokenDTO newToken = new TokenDTO();
+//                String username = claims.getSubject();
+//                String newAccessToken = JwtUtil.generateAccessToken(username);
+//                String newRefreshToken = JwtUtil.generateRefreshToken(username);
+//                newToken.setAccessToken(newAccessToken);
+//                newToken.setRefreshToken(newRefreshToken);
+                return null;
             } else {
                 // 잘못된 리프레시 토큰인 경우
                 throw e;
@@ -98,7 +102,34 @@ public class LoginServiceImpl implements LoginService {
         } catch (Exception e) {
             throw e;
         }
-        tokenDTO.setRefreshToken(refreshToken);
-        return tokenDTO;
+//        tokenDTO.setRefreshToken(refreshToken);
+        return null;
+    }
+
+    // 로그인한 사용자 정보
+    @Override
+    public UsersDTO loginUser() throws Exception {
+        try {
+           Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            System.out.println("authentication = " + authentication);
+            if (authentication != null && authentication.getPrincipal() != null) {
+                UserDetails userDetails = (UserDetails) authentication.getPrincipal();
+                System.out.println("userDetails = " + userDetails);
+                String username = userDetails.getUsername();
+
+                Users users = usersRepo.findByUserId(username);
+                if (users != null) {
+                    UsersDTO usersDTO = new UsersDTO();
+                    BeanUtils.copyProperties(users, usersDTO);
+                    return usersDTO;
+                } else {
+                    return null;
+                }
+            } else {
+                return null;
+            }
+        } catch (Exception e) {
+            throw e;
+        }
     }
 }

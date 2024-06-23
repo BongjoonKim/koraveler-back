@@ -5,6 +5,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Lazy;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
@@ -49,14 +50,15 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http, AuthenticationConfiguration authenticationConfiguration) throws Exception {
-//        CustomAuthenticationFilter customAuthenticationFilter = new CustomAuthenticationFilter(authenticationConfiguration.getAuthenticationManager());
-//        customAuthenticationFilter.setFilterProcessesUrl("/login"); // Optional: Set custom login URL
-
         http
                 .csrf(csrf -> csrf.disable())
                 .formLogin(AbstractHttpConfigurer::disable)
             .authorizeHttpRequests(req -> req
-                .requestMatchers("/login").permitAll()
+                .requestMatchers("ps/**").permitAll()
+                            .requestMatchers("ps/login").permitAll()
+//                .requestMatchers("/login/refresh").permitAll()
+//                .requestMatchers("/menus/**").permitAll()
+//                    .requestMatchers("/user/**").permitAll()
                 .anyRequest().authenticated()
             ).sessionManagement(session -> session
                 .sessionCreationPolicy(SessionCreationPolicy.STATELESS)

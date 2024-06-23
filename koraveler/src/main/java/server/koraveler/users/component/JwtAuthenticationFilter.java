@@ -53,27 +53,29 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         // JWT 토큰은 "Bearer "로 시작하므로 이를 검증합니다.
         if (requestTokenHeader != null && requestTokenHeader.startsWith("Bearer ")) {
             accessToken = requestTokenHeader.substring(7);
-            try {
-                Claims decodedJWT = JwtUtil.verifyToken(accessToken);
-                username = decodedJWT.getSubject();
-                System.out.println("decodedJWT = " + decodedJWT);
-            } catch (IllegalArgumentException e) {
-                System.out.println("Unable to get JWT Token");
-            } catch (RuntimeException e) {
-                // 프론트에 Refresh 토큰을 요청한다
-                RestTemplate restTemplate = new RestTemplate();
-                HttpHeaders headers = new HttpHeaders();
-                headers.add("Content-Type", "application/json");
-                headers.add("Authorization", "Bearer " + accessToken);
-                TokenDTO tokenDTO = new TokenDTO();
-                tokenDTO.setAccessToken(accessToken);
+            if (accessToken != null) {
+                try {
+                    Claims decodedJWT = JwtUtil.verifyToken(accessToken);
+                    username = decodedJWT.getSubject();
+                    System.out.println("decodedJWT = " + decodedJWT);
+                } catch (IllegalArgumentException e) {
+                    System.out.println("Unable to get JWT Token");
+                } catch (RuntimeException e) {
+                    // 프론트에 Refresh 토큰을 요청한다
+                    RestTemplate restTemplate = new RestTemplate();
+                    HttpHeaders headers = new HttpHeaders();
+                    headers.add("Content-Type", "application/json");
+                    headers.add("Authorization", "Bearer " + accessToken);
+                    TokenDTO tokenDTO = new TokenDTO();
+                    tokenDTO.setAccessToken(accessToken);
 
-                HttpEntity entity = new HttpEntity(tokenDTO, headers);
-                restTemplate.exchange("frontUrl/refresh", HttpMethod.POST, entity, String.class);
+                    HttpEntity entity = new HttpEntity(tokenDTO, headers);
+                    restTemplate.exchange("frontUrl/refresh", HttpMethod.POST, entity, String.class);
 
-                System.out.println("JWT Token has expired");
-            } catch (Exception e) {
-                System.out.println("Unable to get JWT Token");
+                    System.out.println("JWT Token has expired");
+                } catch (Exception e) {
+                    System.out.println("Unable to get JWT Token");
+                }
             }
         } else {
             logger.warn("JWT Token does not begin with Bearer String");

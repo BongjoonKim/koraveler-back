@@ -12,7 +12,7 @@ import server.koraveler.menus.service.MenusService;
 import java.util.List;
 
 @RestController
-@RequestMapping("/menus")
+@RequestMapping("ps/menus")
 @Slf4j
 public class MenusController {
     @Autowired
