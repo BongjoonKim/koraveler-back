@@ -55,6 +55,8 @@ public class LoginController{
             return ResponseEntity.ok(loginService.refreshToken(data.get("refreshToken")));
         } catch (CustomException e) {
             return new ResponseEntity<>(new CustomException(e.getStatus(), e.getMsg()), e.getStatus());
+        } catch (Exception e) {
+            return null;
         }
     }
 
@@ -65,6 +67,15 @@ public class LoginController{
             return ResponseEntity.ok(loginService.loginUser());
         } catch (Exception e) {
             return new ResponseEntity<>("ssssss", HttpStatus.UNAUTHORIZED);
+        }
+    }
+
+    @GetMapping("/logout")
+    public ResponseEntity<?> getLogout() {
+        try {
+            
+        } catch (Exception e) {
+            return new ResponseEntity<>(e.getMessage(), HttpStatus.UNAUTHORIZED);
         }
     }
 }

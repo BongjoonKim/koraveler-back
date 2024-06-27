@@ -12,6 +12,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.util.ObjectUtils;
 import org.springframework.util.StringUtils;
+import server.koraveler.error.CustomException;
 import server.koraveler.users.dto.CustomUserDetails;
 import server.koraveler.users.dto.TokenDTO;
 import server.koraveler.users.dto.UsersDTO;
@@ -69,9 +70,9 @@ public class LoginServiceImpl implements LoginService {
 
     // refresh token verify, access token 재생성
     @Override
-    public TokenDTO refreshToken(String refreshToken) throws RuntimeException, Exception {
-        TokenDTO tokenDTO = new TokenDTO();
+    public TokenDTO refreshToken(String refreshToken) throws CustomException, Exception {
         try {
+            TokenDTO tokenDTO = new TokenDTO();
             Claims claims = JwtUtil.verifyToken(refreshToken);
             System.out.println("claims = " + claims.getSubject().isEmpty());
             if(!claims.getSubject().isEmpty()) {
@@ -83,27 +84,19 @@ public class LoginServiceImpl implements LoginService {
                 tokenDTO.setAccessToken(newAccessToken);
                 return tokenDTO;
             }
-        } catch (RuntimeException e) {
+        } catch (CustomException e) {
             String message = e.getMessage();
             if (message.contains("Token expired")) {
-                // 리프레시 토큰이 만료된 경우 재로그인 시켜야함
-//                Claims claims = JwtUtil.verifyToken(refreshToken);
-//                TokenDTO newToken = new TokenDTO();
-//                String username = claims.getSubject();
-//                String newAccessToken = JwtUtil.generateAccessToken(username);
-//                String newRefreshToken = JwtUtil.generateRefreshToken(username);
-//                newToken.setAccessToken(newAccessToken);
-//                newToken.setRefreshToken(newRefreshToken);
-                return null;
+                throw e;
             } else {
                 // 잘못된 리프레시 토큰인 경우
                 throw e;
             }
         } catch (Exception e) {
             throw e;
+        } finally {
+            return null;
         }
-//        tokenDTO.setRefreshToken(refreshToken);
-        return null;
     }
 
     // 로그인한 사용자 정보
