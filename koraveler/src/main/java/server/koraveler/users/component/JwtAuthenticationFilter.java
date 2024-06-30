@@ -57,7 +57,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 try {
                     Claims decodedJWT = JwtUtil.verifyToken(accessToken);
                     username = decodedJWT.getSubject();
-                    System.out.println("decodedJWT = " + decodedJWT);
                 } catch (IllegalArgumentException e) {
                     System.out.println("Unable to get JWT Token");
                 } catch (RuntimeException e) {

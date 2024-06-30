@@ -73,7 +73,7 @@ public class LoginController{
     @GetMapping("/logout")
     public ResponseEntity<?> getLogout() {
         try {
-            
+            return ResponseEntity.ok(loginService.logout());
         } catch (Exception e) {
             return new ResponseEntity<>(e.getMessage(), HttpStatus.UNAUTHORIZED);
         }

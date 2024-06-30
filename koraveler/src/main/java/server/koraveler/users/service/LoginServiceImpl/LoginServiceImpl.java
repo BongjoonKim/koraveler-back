@@ -125,4 +125,9 @@ public class LoginServiceImpl implements LoginService {
             throw e;
         }
     }
+
+    @Override
+    public UsersDTO logout() throws Exception {
+        return null;
+    }
 }
