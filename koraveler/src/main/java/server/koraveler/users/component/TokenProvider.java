@@ -19,13 +19,12 @@ import java.util.function.Function;
 @Slf4j
 public class TokenProvider {
 
-    @Value("${jwt.secret}")
+    @Value("${jwt.secretKey}")
     private String secret;
 
     @Value("${jwt.expiration}")
     private long expiration;
 
-    // JWT 토큰 생성
     public String createToken(Authentication authentication) {
         UserDetails userDetails = (UserDetails) authentication.getPrincipal();
         Date now = new Date();
@@ -38,6 +37,7 @@ public class TokenProvider {
                 .signWith(SignatureAlgorithm.HS512, secret)
                 .compact();
     }
+
 
     // 토큰에서 사용자 이름 추출
     public String getUsernameFromToken(String token) {

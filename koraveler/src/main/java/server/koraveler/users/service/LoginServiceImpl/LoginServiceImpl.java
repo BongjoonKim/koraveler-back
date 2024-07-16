@@ -127,7 +127,11 @@ public class LoginServiceImpl implements LoginService {
     }
 
     @Override
-    public UsersDTO logout() throws Exception {
-        return null;
+    public void logout() throws Exception {
+        try {
+            SecurityContextHolder.clearContext();
+        } catch (Exception e) {
+            throw e;
+        }
     }
 }

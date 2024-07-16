@@ -12,5 +12,5 @@ public interface LoginService {
     // 로그인한 사용자 불러오기
     public UsersDTO loginUser() throws Exception;
 
-     UsersDTO logout() throws Exception;
+     void logout() throws Exception;
 }
