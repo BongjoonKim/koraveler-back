@@ -55,7 +55,7 @@ public class SecurityConfig {
                 .formLogin(AbstractHttpConfigurer::disable)
             .authorizeHttpRequests(req -> req
                 .requestMatchers("ps/**").permitAll()
-                            .requestMatchers("ps/login").permitAll()
+//                            .requestMatchers("ps/login").permitAll()
 //                .requestMatchers("/login/refresh").permitAll()
 //                .requestMatchers("/menus/**").permitAll()
 //                    .requestMatchers("/user/**").permitAll()

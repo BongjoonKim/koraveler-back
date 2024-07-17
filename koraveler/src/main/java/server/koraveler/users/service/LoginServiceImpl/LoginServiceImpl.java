@@ -72,18 +72,16 @@ public class LoginServiceImpl implements LoginService {
     @Override
     public TokenDTO refreshToken(String refreshToken) throws CustomException, Exception {
         try {
-            TokenDTO tokenDTO = new TokenDTO();
+            TokenDTO newTokenDTO = new TokenDTO();
             Claims claims = JwtUtil.verifyToken(refreshToken);
             System.out.println("claims = " + claims.getSubject().isEmpty());
             if(!claims.getSubject().isEmpty()) {
                 String userId = claims.getSubject();
                 String newAccessToken  = JwtUtil.generateAccessToken(userId);
-
-
-                tokenDTO.setRefreshToken(refreshToken);
-                tokenDTO.setAccessToken(newAccessToken);
-                return tokenDTO;
+                newTokenDTO.setRefreshToken(refreshToken);
+                newTokenDTO.setAccessToken(newAccessToken);
             }
+            return newTokenDTO;
         } catch (CustomException e) {
             String message = e.getMessage();
             if (message.contains("Token expired")) {
@@ -94,8 +92,6 @@ public class LoginServiceImpl implements LoginService {
             }
         } catch (Exception e) {
             throw e;
-        } finally {
-            return null;
         }
     }
 

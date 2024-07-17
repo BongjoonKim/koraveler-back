@@ -52,7 +52,8 @@ public class LoginController{
             @RequestBody HashMap<String, String> data
             ) {
         try {
-            return ResponseEntity.ok(loginService.refreshToken(data.get("refreshToken")));
+            TokenDTO tokenDTO = loginService.refreshToken(data.get("refreshToken"));
+            return ResponseEntity.ok(tokenDTO);
         } catch (CustomException e) {
             return new ResponseEntity<>(new CustomException(e.getStatus(), e.getMsg()), e.getStatus());
         } catch (Exception e) {
