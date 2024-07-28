@@ -4,7 +4,7 @@ import lombok.*;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 import org.springframework.security.core.GrantedAuthority;
-import server.koraveler.common.dto.Common;
+import server.koraveler.common.dto.UserCommon;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 
 
@@ -19,7 +19,7 @@ import java.util.stream.Collectors;
 @AllArgsConstructor
 @NoArgsConstructor
 @Builder
-public class Users extends Common {
+public class Users extends UserCommon {
     @Id
     private String id;
     private String userId;

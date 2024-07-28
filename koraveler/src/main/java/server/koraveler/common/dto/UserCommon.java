@@ -1,7 +1,6 @@
 package server.koraveler.common.dto;
 
 import lombok.*;
-import org.springframework.data.annotation.Id;
 
 import java.time.LocalDateTime;
 
@@ -9,7 +8,7 @@ import java.time.LocalDateTime;
 @Setter
 //@AllArgsConstructor
 //@NoArgsConstructor
-public class Common {
+public class UserCommon {
     private LocalDateTime created;
     private LocalDateTime updated;
     private boolean isNonExpired;

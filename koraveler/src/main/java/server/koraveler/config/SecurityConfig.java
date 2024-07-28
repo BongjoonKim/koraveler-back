@@ -1,5 +1,6 @@
 package server.koraveler.config;
 
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
@@ -17,6 +18,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.util.matcher.RequestMatcher;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -54,15 +56,10 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .formLogin(AbstractHttpConfigurer::disable)
             .authorizeHttpRequests(req -> req
-                .requestMatchers("ps/**").permitAll()
-//                            .requestMatchers("ps/login").permitAll()
-//                .requestMatchers("/login/refresh").permitAll()
-//                .requestMatchers("/menus/**").permitAll()
-//                    .requestMatchers("/user/**").permitAll()
+                .requestMatchers(new ContainsPsRequestMatcher()).permitAll()
                 .anyRequest().authenticated()
             ).sessionManagement(session -> session
                 .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
-//                ).addFilter(jwtAuthenticationFilter
             ).addFilter(customAuthenticationFilter
             ).addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
@@ -82,5 +79,12 @@ public class SecurityConfig {
         source.registerCorsConfiguration("/**", corsConfiguration); // 모든 경로에 대해서 CORS 설정을 적용
 
         return source;
+    }
+
+    private static class ContainsPsRequestMatcher implements RequestMatcher {
+        @Override
+        public boolean matches(HttpServletRequest request) {
+            return request.getRequestURI().contains("ps");
+        }
     }
 }
