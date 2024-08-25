@@ -6,5 +6,6 @@ import server.koraveler.blog.model.Documents;
 
 @Repository
 public interface BlogsRepo extends MongoRepository<Documents, String> {
-
+    @Override
+    long count();
 }

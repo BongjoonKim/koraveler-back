@@ -9,9 +9,10 @@ import java.util.List;
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class DocumentsInfo {
-    private long totalContents;
-    private int totalPages;
+    private long totalDocsCnt;
+    private int totalPagesCnt;
     private List<DocumentsDTO> documentsDTO;
 
     @Data

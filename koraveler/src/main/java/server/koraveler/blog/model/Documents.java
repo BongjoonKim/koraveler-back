@@ -24,4 +24,5 @@ public class Documents extends CommonDTO {
     private List<String> tags;
     private String folderId;
     private String color;
+    private String thumbnailImgUrl;
 }
