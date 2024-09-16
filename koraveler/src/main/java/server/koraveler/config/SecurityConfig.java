@@ -47,6 +47,9 @@ public class SecurityConfig {
         return new BCryptPasswordEncoder();
     }
 
+    @Autowired
+    private CorsConfig corsConfig;
+
     @Bean
     public AuthenticationManager authenticationManager(AuthenticationConfiguration authenticationConfiguration) throws Exception {
         return authenticationConfiguration.getAuthenticationManager();
@@ -56,7 +59,7 @@ public class SecurityConfig {
     public SecurityFilterChain filterChain(HttpSecurity http, AuthenticationConfiguration authenticationConfiguration) throws Exception {
         http
             .cors(cors -> {
-                cors.configurationSource(CorsConfig.corsConfigurationSource());
+                cors.configurationSource(corsConfig.corsConfigurationSource());
             })
             .csrf(csrf -> csrf.disable())
             .formLogin(AbstractHttpConfigurer::disable)

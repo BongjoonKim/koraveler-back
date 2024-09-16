@@ -1,6 +1,7 @@
 package server.koraveler.config;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Configuration;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -8,16 +9,18 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import java.util.ArrayList;
 import java.util.Collections;
 
+@Configuration
 public class CorsConfig {
-    @Value("${loclfront.url}")
-    private long frontUrl;
-    public static CorsConfigurationSource corsConfigurationSource() {
+    @Value("${front.url}")
+    private String frontUrl;
+    public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
         //리소스를 허용할 URL 지정
+        System.out.println("frontUrl" + frontUrl);
         ArrayList<String> allowedOriginPatterns = new ArrayList<>();
-        allowedOriginPatterns.add("http://localhost:3002");
-        allowedOriginPatterns.add("http://127.0.0.1:5000");
+//        allowedOriginPatterns.add("http://localhost:3002");
+        allowedOriginPatterns.add(frontUrl);
         configuration.setAllowedOrigins(allowedOriginPatterns);
 
         //허용하는 HTTP METHOD 지정
