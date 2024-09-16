@@ -23,6 +23,7 @@ import org.springframework.security.web.util.matcher.RequestMatcher;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import org.springframework.web.filter.CorsFilter;
 import server.koraveler.users.component.CustomAuthenticationFilter;
 import server.koraveler.users.component.JwtAuthenticationFilter;
 
@@ -54,6 +55,9 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http, AuthenticationConfiguration authenticationConfiguration) throws Exception {
         http
+            .cors(cors -> {
+                cors.configurationSource(CorsConfig.corsConfigurationSource());
+            })
             .csrf(csrf -> csrf.disable())
             .formLogin(AbstractHttpConfigurer::disable)
             .authorizeHttpRequests(req -> req
@@ -71,7 +75,7 @@ public class SecurityConfig {
 //    public CorsConfigurationSource corsConfigurationSource() {
 //        CorsConfiguration corsConfiguration = new CorsConfiguration();
 //
-//        corsConfiguration.setAllowedOriginPatterns(List.of("*"));
+//        corsConfiguration.setAllowedOriginPatterns(List.of("http://localhost:3002"));
 //        corsConfiguration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "HEAD", "OPTIONS"));
 //        corsConfiguration.setAllowedHeaders(List.of("Authorization", "Cache-Control", "Content-Type"));
 //        corsConfiguration.setAllowCredentials(true);
@@ -80,6 +84,21 @@ public class SecurityConfig {
 //        source.registerCorsConfiguration("/**", corsConfiguration); // 모든 경로에 대해서 CORS 설정을 적용
 //
 //        return source;
+//    }
+
+//    @Bean
+//    public CorsFilter corsFilter() {
+//        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+//        CorsConfiguration config = new CorsConfiguration();
+//
+//        // CORS 설정 허용
+//        config.setAllowCredentials(true);  // 쿠키와 같은 인증 관련 정보 허용
+//        config.addAllowedOriginPattern("*");  // 모든 도메인 허용 (React 개발 시 localhost 사용)
+//        config.addAllowedHeader("*");  // 모든 헤더 허용
+//        config.addAllowedMethod("*");  // 모든 HTTP 메소드 허용 (GET, POST, PUT 등)
+//
+//        source.registerCorsConfiguration("/**", config);  // 모든 경로에 대해 적용
+//        return new CorsFilter(source);
 //    }
 
     private static class ContainsPsRequestMatcher implements RequestMatcher {

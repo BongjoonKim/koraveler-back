@@ -31,7 +31,7 @@ import server.koraveler.utils.JwtUtil;
 import java.util.*;
 
 @RestController
-@RequestMapping("ps/login")
+@RequestMapping("/login")
 @RequiredArgsConstructor
 @Slf4j
 public class LoginController{
@@ -47,7 +47,7 @@ public class LoginController{
     @Autowired
     private PasswordEncoder passwordEncoder;
 
-    @PostMapping("/refresh")
+    @PostMapping("/ps/refresh")
     public ResponseEntity<?> refreshToken(
             @RequestBody HashMap<String, String> data
             ) {
@@ -67,17 +67,29 @@ public class LoginController{
         try {
             return ResponseEntity.ok(loginService.loginUser());
         } catch (Exception e) {
-            return new ResponseEntity<>("ssssss", HttpStatus.UNAUTHORIZED);
+            return new ResponseEntity<>(null, HttpStatus.UNAUTHORIZED);
         }
     }
 
-    @GetMapping("/logout")
+    @GetMapping("/ps/logout")
     public ResponseEntity<?> getLogout() {
         try {
             loginService.logout();
             return ResponseEntity.ok("logout successful");
         } catch (Exception e) {
             return new ResponseEntity<>(e.getMessage(), HttpStatus.UNAUTHORIZED);
+        }
+    }
+
+    @PostMapping("/ps/sign-up")
+    public ResponseEntity<?> signUp(
+            @RequestBody UsersDTO usersDTO
+    ) {
+        try {
+            UsersDTO newUsersDTO = loginService.createUser(usersDTO);
+            return ResponseEntity.ok(newUsersDTO);
+        } catch (Exception e) {
+            return new ResponseEntity<>(e.getMessage(), HttpStatus.EXPECTATION_FAILED);
         }
     }
 }

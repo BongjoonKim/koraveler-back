@@ -22,6 +22,8 @@ import server.koraveler.users.service.LoginService;
 import server.koraveler.utils.JwtUtil;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 @Service
@@ -32,40 +34,46 @@ public class LoginServiceImpl implements LoginService {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
-    @Override
-    public UsersDTO login(UsersDTO usersDTO) {
-        // 사용자 비번 암호화 후 저장
-        Users users = findUserByUserId(usersDTO.getUserId());
-
-        if (ObjectUtils.isEmpty(users)) {
-            createUser(usersDTO);
-        }
-        return null;
-    }
-
     private Users findUserByUserId(String userId) {
         return usersRepo.findByUserId(userId);
     }
 
-    private UsersDTO createUser(UsersDTO usersDTO) {
-        LocalDateTime now = LocalDateTime.now();
-        Users users = new Users();
 
-        BeanUtils.copyProperties(usersDTO, users);
-
-        users.setCreated(now);
-        users.setUpdated(now);
-        users.setEnabled(true);
-
+    @Override
+    public UsersDTO createUser(UsersDTO usersDTO) throws Exception {
         try {
+            // validation 체크
+            // 1. 이미 있는 아이디인 경우
+            Users users = usersRepo.findByUserId(usersDTO.getUserId());
+            if (!ObjectUtils.isEmpty(users)) {
+                throw new Exception("이미 존재하는 ID입니다");
+            }
+
+            // 2. 이미 있는 이메일인 경우
+            users = usersRepo.findByEmail(usersDTO.getEmail());
+            if (!ObjectUtils.isEmpty(users)) {
+                throw new Exception("이미 존재하는 이메일입니다");
+            }
+
+            LocalDateTime now = LocalDateTime.now();
+            users = new Users();
+
+            BeanUtils.copyProperties(usersDTO, users);
+            users.setUserPassword(passwordEncoder.encode(usersDTO.getUserPassword()));
+            users.setCreated(now);
+            users.setUpdated(now);
+            users.setEnabled(true);
+            users.setRoles(Collections.singletonList("user"));
+
             usersRepo.save(users);
+
+            UsersDTO newUsersDTO = new UsersDTO();
+            BeanUtils.copyProperties(users,newUsersDTO);
+            return newUsersDTO;
         } catch (Exception e) {
             throw e;
         }
 
-        UsersDTO newUsersDTO = new UsersDTO();
-        BeanUtils.copyProperties(users,newUsersDTO);
-        return newUsersDTO;
     }
 
     // refresh token verify, access token 재생성
@@ -130,4 +138,8 @@ public class LoginServiceImpl implements LoginService {
             throw e;
         }
     }
+
+
+
+
 }

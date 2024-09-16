@@ -8,3 +8,5 @@ import server.koraveler.users.model.Users;
 @Data
 public class UsersDTO extends Users {
 }
+
+

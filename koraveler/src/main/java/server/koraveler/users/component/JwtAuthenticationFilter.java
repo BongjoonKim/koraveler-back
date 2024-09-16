@@ -69,7 +69,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     tokenDTO.setAccessToken(accessToken);
 
                     HttpEntity entity = new HttpEntity(tokenDTO, headers);
-                    restTemplate.exchange("frontUrl/refresh", HttpMethod.POST, entity, String.class);
+                    // refresh까지 만료되면 로그인 화면으로 보내줄 로직
+//                    restTemplate.exchange(frontUrl + "/refresh", HttpMethod.POST, entity, String.class);
 
                     System.out.println("JWT Token has expired");
                 } catch (Exception e) {

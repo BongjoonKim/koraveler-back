@@ -45,7 +45,7 @@ public class UsersServiceImpl implements UsersService {
     @Override
     public UsersDTO getUser(String email) throws Exception {
         try {
-            Users users = userRepo.findByEmail(email).get(0);
+            Users users = userRepo.findByEmail(email);
             UsersDTO usersDTO = new UsersDTO();
             BeanUtils.copyProperties(users, usersDTO);
             return usersDTO;
