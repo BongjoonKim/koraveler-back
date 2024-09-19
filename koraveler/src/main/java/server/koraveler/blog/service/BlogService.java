@@ -11,8 +11,7 @@ public interface BlogService {
     DocumentsInfo.DocumentsDTO createAfterSaveDocument(DocumentsInfo.DocumentsDTO documentsDTO);
     DocumentsInfo.DocumentsDTO saveDocument(DocumentsInfo.DocumentsDTO documentsDTO);
 
-
-    DocumentsInfo getAllDocuments(PaginationDTO pageDTO);
+    DocumentsInfo getDocuments(PaginationDTO pageDTO) throws Exception;
     DocumentsInfo.DocumentsDTO getDocument(String id) throws Exception;
     void deleteDocument(String id) throws Exception;
 

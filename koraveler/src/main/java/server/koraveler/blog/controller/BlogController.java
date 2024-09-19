@@ -3,8 +3,10 @@ package server.koraveler.blog.controller;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 import server.koraveler.blog.dto.DocumentsInfo;
 import server.koraveler.blog.dto.PaginationDTO;
 import server.koraveler.blog.service.BlogService;
@@ -58,16 +60,31 @@ public class BlogController {
     }
 
     @GetMapping("/ps/documents")
-    public DocumentsInfo getAllDocuments(
+    public DocumentsInfo getDocumentsByNonAuth(
             @RequestParam("page") int page,
             @RequestParam("size") int size,
             @RequestParam("folderId") String folderId
     ) {
         try {
-            return blogService.getAllDocuments(new PaginationDTO(page, size, folderId));
+            return blogService.getDocuments(new PaginationDTO(page, size, folderId, null));
         } catch (Exception e) {
             e.printStackTrace();
-            throw e;
+            throw new ResponseStatusException(HttpStatus.valueOf("error"), e.getMessage());
+        }
+    }
+
+    @GetMapping("/documents")
+    public DocumentsInfo getDocumentsByAuth(
+            @RequestParam("page") int page,
+            @RequestParam("size") int size,
+            @RequestParam("folderId") String folderId,
+            @RequestParam("type") String type
+    ) {
+        try {
+            return blogService.getDocuments(new PaginationDTO(page, size, folderId, type));
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw new ResponseStatusException(HttpStatus.valueOf("error"), e.getMessage());
         }
     }
 
