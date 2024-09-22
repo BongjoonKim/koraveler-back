@@ -14,6 +14,8 @@ public class CorsConfig {
     @Value("${front.url.local}")
     private String frontLocalUrl;
 
+    @Value("${front.url.prod}")
+    private String frontProdUrl;
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
@@ -21,6 +23,7 @@ public class CorsConfig {
         ArrayList<String> allowedOriginPatterns = new ArrayList<>();
 //        allowedOriginPatterns.add("http://localhost:3002");
         allowedOriginPatterns.add(frontLocalUrl);
+        allowedOriginPatterns.add(frontProdUrl);
         configuration.setAllowedOrigins(allowedOriginPatterns);
 
         //허용하는 HTTP METHOD 지정
