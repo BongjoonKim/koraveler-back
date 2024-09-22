@@ -15,7 +15,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 @RestController
-@RequestMapping("blog")
+@RequestMapping("/blog")
 @RequiredArgsConstructor
 @Slf4j
 public class BlogController {
