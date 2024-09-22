@@ -20,7 +20,6 @@ public class CorsConfig {
         CorsConfiguration configuration = new CorsConfiguration();
 
         //리소스를 허용할 URL 지정
-        System.out.println("frontUrl" + frontLocalUrl);
         ArrayList<String> allowedOriginPatterns = new ArrayList<>();
 //        allowedOriginPatterns.add("http://localhost:3002");
         allowedOriginPatterns.add(frontLocalUrl);
