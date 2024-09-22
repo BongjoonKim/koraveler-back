@@ -2,12 +2,11 @@ package server.koraveler.blog.service.BlogServiceImpl;
 
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.*;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.aggregation.*;
 import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.support.PageableExecutionUtils;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -106,11 +105,16 @@ public class BlogServiceImpl implements BlogService {
     public DocumentsInfo getDocuments(PaginationDTO pageDTO) throws Exception {
         try {
             Page<Documents> documents = null;
+            Sort.Order updatedSort = "ASC".equals(pageDTO.getDateSort()) ? Sort.Order.asc("updated") : Sort.Order.desc("updated");
+            Sort sort = Sort.by(updatedSort);
+
+            Pageable pageable = PageRequest.of(pageDTO.getPage(), pageDTO.getSize(), sort);
+
             if ("all".equals(pageDTO.getFolderId()) || pageDTO.getPage() == -1) {
-                documents = blogsRepo.findAll(PageRequest.of(pageDTO.getPage(), pageDTO.getSize()));
+                documents = blogsRepo.findAllByDraftIsFalseOrDraftIsNull(pageable);
             } else {
                 if (ObjectUtils.isEmpty(pageDTO.getPageType())) {
-                    documents = blogsRepo.findAll(PageRequest.of(pageDTO.getPage(), pageDTO.getSize()));
+                    documents = blogsRepo.findAllByDraftIsFalseOrDraftIsNull(pageable);
                 } else {
                     Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
                     if (authentication != null && authentication.getPrincipal() != null) {
@@ -119,21 +123,15 @@ public class BlogServiceImpl implements BlogService {
                         Users users = usersRepo.findByUserId(username);
                         if (!ObjectUtils.isEmpty(users)) {
                             if (BlogConstants.BlogPageType.MY_BLOG.getValue().equals(pageDTO.getPageType())) {
-                                Pageable pageable = PageRequest.of(pageDTO.getPage(), pageDTO.getSize());
-                                documents = blogsRepo.findAllByCreatedUserOrUpdatedUser(users.getUserId(), users.getUserId(), pageable);
+                                documents = this.findByCreatedUserOrUpdatedUserAndDraft(users.getUserId(), users.getUserId(), pageable, false);
                             } else if (BlogConstants.BlogPageType.BOOKMARK.getValue().equals(pageDTO.getPageType())) {
                                 // 1. documents 컬렉션에서 createdUser 또는 updatedUser가 userId인 문서 찾기
                                 AggregationOperation matchDocuments = Aggregation.match(
                                         new Criteria().orOperator(
                                                 Criteria.where("createdUser").is(users.getUserId()),
                                                 Criteria.where("updatedUser").is(users.getUserId())
-                                        )
+                                        ).and("draft").is(false)
                                 );
-
-                                // 타입이 다를 경우 사용
-//                                AggregationOperation projectIdToString = project()
-//                                        .andExpression("toString(_id)").as("idAsString")
-//                                        .andExclude("_id"); // 필요한 필드 포함
 
                                 // 2. con_bookmarks_users_documents 컬렉션에서 userId가 userId인 문서 찾기
                                 AggregationOperation lookupBookmarks = Aggregation.lookup(
@@ -160,22 +158,6 @@ public class BlogServiceImpl implements BlogService {
                                         aggregation, "documents", Documents.class
                                 );
 
-                                List<Documents> results22 = results.getMappedResults();
-                                System.out.println("results22 = " + results22);
-
-
-
-
-
-
-
-
-
-
-
-
-                                Pageable pageable = PageRequest.of(pageDTO.getPage(), pageDTO.getSize());
-
 
                                 Aggregation countAggregation = Aggregation.newAggregation(
                                         matchDocuments,
@@ -190,9 +172,11 @@ public class BlogServiceImpl implements BlogService {
                                         .getUniqueMappedResult().getTotal() : 0;
 
                                 documents = PageableExecutionUtils.getPage(
-                                    results.getMappedResults(),
-                                    pageable,
-                                    () -> totalCount);
+                                        results.getMappedResults(),
+                                        pageable,
+                                        () -> totalCount);
+                            } else if (BlogConstants.BlogPageType.DRAFT.getValue().equals(pageDTO.getPageType())) {
+                                documents = this.findByCreatedUserOrUpdatedUserAndDraft(users.getUserId(), users.getUserId(), pageable, true);
                             }
                         } else {
                             throw new Exception("there is no user : " + username);
@@ -266,4 +250,27 @@ public class BlogServiceImpl implements BlogService {
             this.total = total;
         }
     }
+
+    private Page<Documents> findByCreatedUserOrUpdatedUserAndDraft(String createdUser, String updatedUser, Pageable pageable, boolean isDraft) {
+        // 조건 생성
+        Criteria criteria = new Criteria().orOperator(
+                Criteria.where("createdUser").is(createdUser),
+                Criteria.where("updatedUser").is(updatedUser)
+        ).and("draft").is(isDraft);
+
+        // 쿼리 생성
+        Query query = new Query(criteria);
+
+        // 페이지네이션 적용
+        long total = mongoTemplate.count(query, Documents.class);  // 전체 데이터 개수 계산
+        query.with(pageable);  // Pageable로 페이징 정보 적용
+
+        // 데이터 조회
+        List<Documents> entities = mongoTemplate.find(query, Documents.class);
+
+        // Page 객체로 반환 (페이지네이션 정보와 결과 리스트)
+        return new PageImpl<>(entities, pageable, total);
+    };
 }
+
+

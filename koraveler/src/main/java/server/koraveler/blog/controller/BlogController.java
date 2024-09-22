@@ -63,10 +63,11 @@ public class BlogController {
     public DocumentsInfo getDocumentsByNonAuth(
             @RequestParam("page") int page,
             @RequestParam("size") int size,
-            @RequestParam("folderId") String folderId
+            @RequestParam("folderId") String folderId,
+            @RequestParam("dateSort") String dateSort
     ) {
         try {
-            return blogService.getDocuments(new PaginationDTO(page, size, folderId, null));
+            return blogService.getDocuments(new PaginationDTO(page, size, folderId, null, dateSort));
         } catch (Exception e) {
             e.printStackTrace();
             throw new ResponseStatusException(HttpStatus.valueOf("error"), e.getMessage());
@@ -78,10 +79,11 @@ public class BlogController {
             @RequestParam("page") int page,
             @RequestParam("size") int size,
             @RequestParam("folderId") String folderId,
-            @RequestParam("type") String type
+            @RequestParam("type") String type,
+            @RequestParam("dateSort") String dateSort
     ) {
         try {
-            return blogService.getDocuments(new PaginationDTO(page, size, folderId, type));
+            return blogService.getDocuments(new PaginationDTO(page, size, folderId, type, dateSort));
         } catch (Exception e) {
             e.printStackTrace();
             throw new ResponseStatusException(HttpStatus.valueOf("error"), e.getMessage());

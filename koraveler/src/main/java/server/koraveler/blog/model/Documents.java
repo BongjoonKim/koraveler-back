@@ -25,4 +25,5 @@ public class Documents extends CommonDTO {
     private String folderId;
     private String color;
     private String thumbnailImgUrl;
+    private boolean draft;
 }

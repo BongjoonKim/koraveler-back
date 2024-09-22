@@ -16,4 +16,5 @@ public class PaginationDTO {
     private int size;
     private String folderId;
     private String pageType;
+    private String dateSort;
 }
