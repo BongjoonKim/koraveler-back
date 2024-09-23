@@ -17,16 +17,18 @@ public class WebConfig implements WebMvcConfigurer {
     @Override
     public void addCorsMappings(CorsRegistry registry) {
         registry.addMapping("/**")
-                .allowedOrigins(frontLocalUrl)
-                .allowedOrigins(frontProdUrl)
-                .allowedOrigins("https://www.koraveler.com")
-                .allowedOrigins("www.koraveler.com")
-        .allowedOrigins("https://www.koraveler.com/")
-        .allowedOrigins("www.koraveler.com/")
-        .allowedOrigins("https://www.koraveler.com:3002")
-        .allowedOrigins("www.koraveler.com:3002")
-        .allowedOrigins("https://www.koraveler.com:3002/")
-        .allowedOrigins("www.koraveler.com:3002/")
+                .allowedOrigins(
+                        frontLocalUrl,
+                        frontProdUrl,
+                        "https://www.koraveler.com",
+                        "www.koraveler.com",
+                        "https://www.koraveler.com/",
+                        "www.koraveler.com/",
+                        "https://www.koraveler.com:3002",
+                        "www.koraveler.com:3002",
+                        "https://www.koraveler.com:3002/",
+                        "www.koraveler.com:3002/"
+                )
                 .allowedMethods("GET", "POST", "PUT", "DELETE", "HEAD", "OPTIONS")
                 .allowedHeaders("*")
                 .allowCredentials(true);
