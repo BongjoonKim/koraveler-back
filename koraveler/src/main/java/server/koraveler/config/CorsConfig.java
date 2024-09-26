@@ -1,12 +1,14 @@
 package server.koraveler.config;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 
 @Configuration
@@ -16,6 +18,8 @@ public class CorsConfig {
 
     @Value("${front.url.prod}")
     private String frontProdUrl;
+
+    @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
@@ -32,8 +36,9 @@ public class CorsConfig {
         allowedOriginPatterns.add("www.koraveler.com:3002");
         allowedOriginPatterns.add("https://www.koraveler.com:3002/");
         allowedOriginPatterns.add("www.koraveler.com:3002/");
-        configuration.setAllowedOrigins(allowedOriginPatterns);
+//        configuration.setAllowedOrigins(allowedOriginPatterns);
 
+        configuration.setAllowedOrigins(Arrays.asList())
         //허용하는 HTTP METHOD 지정
         ArrayList<String> allowedHttpMethods = new ArrayList<>();
         allowedHttpMethods.add("GET");
