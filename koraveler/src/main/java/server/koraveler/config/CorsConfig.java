@@ -25,7 +25,7 @@ public class CorsConfig {
 
         //리소스를 허용할 URL 지정
         ArrayList<String> allowedOriginPatterns = new ArrayList<>();
-//        allowedOriginPatterns.add("http://localhost:3002");
+        allowedOriginPatterns.add("http://localhost:3002");
         allowedOriginPatterns.add(frontLocalUrl);
         allowedOriginPatterns.add(frontProdUrl);
         allowedOriginPatterns.add("https://www.koraveler.com");
@@ -36,9 +36,8 @@ public class CorsConfig {
         allowedOriginPatterns.add("www.koraveler.com:3002");
         allowedOriginPatterns.add("https://www.koraveler.com:3002/");
         allowedOriginPatterns.add("www.koraveler.com:3002/");
-//        configuration.setAllowedOrigins(allowedOriginPatterns);
+        configuration.setAllowedOrigins(allowedOriginPatterns);
 
-        configuration.setAllowedOrigins(Arrays.asList())
         //허용하는 HTTP METHOD 지정
         ArrayList<String> allowedHttpMethods = new ArrayList<>();
         allowedHttpMethods.add("GET");
