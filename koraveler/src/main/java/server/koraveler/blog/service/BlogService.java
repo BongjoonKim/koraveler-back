@@ -15,5 +15,6 @@ public interface BlogService {
     DocumentsInfo.DocumentsDTO getDocument(String id) throws Exception;
     void deleteDocument(String id) throws Exception;
 
+    DocumentsInfo.DocumentsDTO searchDocuments(String value);
 
 }

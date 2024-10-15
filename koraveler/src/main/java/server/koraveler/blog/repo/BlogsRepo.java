@@ -1,6 +1,9 @@
 package server.koraveler.blog.repo;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Primary;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
@@ -14,6 +17,8 @@ import server.koraveler.blog.model.Documents;
 import java.util.List;
 
 @Repository
+@Primary
+@Qualifier("BlogsRepo")
 public interface BlogsRepo extends MongoRepository<Documents, String> {
     @Override
     long count();

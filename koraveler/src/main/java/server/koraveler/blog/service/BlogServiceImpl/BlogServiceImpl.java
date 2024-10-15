@@ -3,6 +3,8 @@ package server.koraveler.blog.service.BlogServiceImpl;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.*;
+import org.springframework.data.elasticsearch.client.elc.ElasticsearchTemplate;
+import org.springframework.data.elasticsearch.core.query.CriteriaQuery;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.aggregation.*;
 import org.springframework.data.mongodb.core.query.Criteria;
@@ -13,23 +15,20 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 import org.springframework.util.ObjectUtils;
-import org.springframework.util.StringUtils;
 import server.koraveler.blog.constants.BlogConstants;
 import server.koraveler.blog.dto.DocumentsInfo;
 import server.koraveler.blog.dto.PaginationDTO;
 import server.koraveler.blog.model.Documents;
 import server.koraveler.blog.repo.BlogsRepo;
+import server.koraveler.blog.elastic.ElasticRepo;
 import server.koraveler.blog.service.BlogService;
 import server.koraveler.connections.bookmarks.repo.BookmarksRepo;
 import server.koraveler.users.model.Users;
 import server.koraveler.users.repo.UsersRepo;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
-
-import static org.springframework.data.mongodb.core.aggregation.Aggregation.project;
 
 @Service
 public class BlogServiceImpl implements BlogService {
@@ -45,6 +44,12 @@ public class BlogServiceImpl implements BlogService {
 
     @Autowired
     private BookmarksRepo bookmarksRepo;
+
+    @Autowired
+    private ElasticRepo elasticRepo;
+
+    @Autowired
+    private ElasticsearchTemplate elasticsearchTemplate;
 
     @Override
     public DocumentsInfo.DocumentsDTO createDocument(DocumentsInfo.DocumentsDTO documentsDTO) {
@@ -63,6 +68,7 @@ public class BlogServiceImpl implements BlogService {
             documents.setCreatedUser(username);
             documents.setUpdatedUser(username);
             Documents afterDocument = blogsRepo.save(documents);
+            elasticRepo.save(documents);
 
             DocumentsInfo.DocumentsDTO newDocDTO = new DocumentsInfo.DocumentsDTO();
             BeanUtils.copyProperties(afterDocument, newDocDTO);
@@ -88,6 +94,7 @@ public class BlogServiceImpl implements BlogService {
                 String username = userDetails.getUsername();
                 documents.setUpdatedUser(username);
                 Documents afterDocument = blogsRepo.save(documents);
+                elasticRepo.save(documents);
 
                 DocumentsInfo.DocumentsDTO newDocDTO = new DocumentsInfo.DocumentsDTO();
                 BeanUtils.copyProperties(afterDocument, newDocDTO);
@@ -211,6 +218,7 @@ public class BlogServiceImpl implements BlogService {
         documents.setThumbnailImgUrl(newData.getThumbnailImgUrl());
 
         Documents newDocument = blogsRepo.save(documents);
+        elasticRepo.save(documents);
         DocumentsInfo.DocumentsDTO newDocumentDTO = new DocumentsInfo.DocumentsDTO();
         BeanUtils.copyProperties(newDocument, newDocumentDTO);
 
@@ -271,6 +279,22 @@ public class BlogServiceImpl implements BlogService {
         // Page 객체로 반환 (페이지네이션 정보와 결과 리스트)
         return new PageImpl<>(entities, pageable, total);
     };
+
+    @Override
+    public DocumentsInfo.DocumentsDTO searchDocuments(String value) {
+        org.springframework.data.elasticsearch.core.query.Criteria criteria = new org.springframework.data.elasticsearch.core.query.Criteria("title").contains(value)
+                .or("contents").contains(value);
+
+        CriteriaQuery query = new CriteriaQuery(criteria);
+
+        org.springframework.data.elasticsearch.core.SearchHits<Documents> searchHits = elasticsearchTemplate.search(query, Documents.class);
+        List<Documents> documents = searchHits.stream().map(hit -> hit.getContent()).collect(Collectors.toList());
+
+        DocumentsInfo.DocumentsDTO newDocument = new DocumentsInfo.DocumentsDTO();
+        BeanUtils.copyProperties(documents, newDocument);
+
+        return newDocument;
+    }
 }
 
 
