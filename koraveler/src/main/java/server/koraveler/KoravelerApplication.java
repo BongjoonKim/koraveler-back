@@ -6,7 +6,12 @@ import org.springframework.data.elasticsearch.repository.config.EnableElasticsea
 import org.springframework.data.mongodb.repository.config.EnableMongoRepositories;
 
 @EnableElasticsearchRepositories("server.koraveler.blog.elastic")
-@EnableMongoRepositories
+@EnableMongoRepositories(basePackages = {
+        "server.koraveler.blog.repo",
+        "server.koraveler.users.repo",
+        "server.koraveler.menus.repo",
+        "server.koraveler.connections.bookmarks.repo"
+})
 @SpringBootApplication
 public class KoravelerApplication {
 
