@@ -24,4 +24,5 @@ public interface BlogsRepo extends MongoRepository<Documents, String> {
     long count();
 
     Page<Documents> findAllByDraftIsFalseOrDraftIsNull(Pageable pageable);
+    Page<Documents> findAllByTitleContainingOrContentsContaining(String value, Pageable pageable);
 }

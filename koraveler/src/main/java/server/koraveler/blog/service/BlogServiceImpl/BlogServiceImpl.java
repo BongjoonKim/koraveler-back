@@ -2,6 +2,7 @@ package server.koraveler.blog.service.BlogServiceImpl;
 
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Bean;
 import org.springframework.data.domain.*;
 import org.springframework.data.elasticsearch.client.elc.ElasticsearchTemplate;
 import org.springframework.data.elasticsearch.core.query.CriteriaQuery;
@@ -27,6 +28,7 @@ import server.koraveler.users.model.Users;
 import server.koraveler.users.repo.UsersRepo;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -210,6 +212,30 @@ public class BlogServiceImpl implements BlogService {
     }
 
     @Override
+    public DocumentsInfo searchDocuments(String value, PaginationDTO pageDTO) throws Exception {
+        try {
+            Pageable pageable = PageRequest.of(pageDTO.getPage(), pageDTO.getSize());
+
+
+            Page<Documents> documents = blogsRepo.findAllByTitleContainingOrContentsContaining(value, pageable);
+
+            List<DocumentsInfo.DocumentsDTO> documentsDTO = new ArrayList<>();
+            DocumentsInfo documentsInfo = new DocumentsInfo();
+
+            if (!ObjectUtils.isEmpty(documents.getContent())) {
+                BeanUtils.copyProperties(documents.getContent(), documentsDTO);
+                documentsInfo.setDocumentsDTO(documentsDTO);
+                documentsInfo.setTotalDocsCnt(documents.getTotalElements());
+                documentsInfo.setTotalPagesCnt(documents.getTotalPages());
+            }
+            return documentsInfo;
+        } catch (Exception e) {
+            throw e;
+        }
+
+    }
+
+    @Override
     public DocumentsInfo.DocumentsDTO createAfterSaveDocument(DocumentsInfo.DocumentsDTO newData) {
         LocalDateTime now = LocalDateTime.now();
         Documents documents = blogsRepo.findById(newData.getId()).get();
@@ -280,21 +306,21 @@ public class BlogServiceImpl implements BlogService {
         return new PageImpl<>(entities, pageable, total);
     };
 
-    @Override
-    public DocumentsInfo.DocumentsDTO searchDocuments(String value) {
-        org.springframework.data.elasticsearch.core.query.Criteria criteria = new org.springframework.data.elasticsearch.core.query.Criteria("title").contains(value)
-                .or("contents").contains(value);
-
-        CriteriaQuery query = new CriteriaQuery(criteria);
-
-        org.springframework.data.elasticsearch.core.SearchHits<Documents> searchHits = elasticsearchTemplate.search(query, Documents.class);
-        List<Documents> documents = searchHits.stream().map(hit -> hit.getContent()).collect(Collectors.toList());
-
-        DocumentsInfo.DocumentsDTO newDocument = new DocumentsInfo.DocumentsDTO();
-        BeanUtils.copyProperties(documents, newDocument);
-
-        return newDocument;
-    }
+//    @Override
+//    public DocumentsInfo.DocumentsDTO searchDocuments(String value) {
+//        org.springframework.data.elasticsearch.core.query.Criteria criteria = new org.springframework.data.elasticsearch.core.query.Criteria("title").contains(value)
+//                .or("contents").contains(value);
+//
+//        CriteriaQuery query = new CriteriaQuery(criteria);
+//
+//        org.springframework.data.elasticsearch.core.SearchHits<Documents> searchHits = elasticsearchTemplate.search(query, Documents.class);
+//        List<Documents> documents = searchHits.stream().map(hit -> hit.getContent()).collect(Collectors.toList());
+//
+//        DocumentsInfo.DocumentsDTO newDocument = new DocumentsInfo.DocumentsDTO();
+//        BeanUtils.copyProperties(documents, newDocument);
+//
+//        return newDocument;
+//    }
 }
 
 

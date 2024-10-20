@@ -12,9 +12,7 @@ public interface BlogService {
     DocumentsInfo.DocumentsDTO saveDocument(DocumentsInfo.DocumentsDTO documentsDTO);
 
     DocumentsInfo getDocuments(PaginationDTO pageDTO) throws Exception;
+    DocumentsInfo searchDocuments(String value, PaginationDTO pageDTO) throws Exception;
     DocumentsInfo.DocumentsDTO getDocument(String id) throws Exception;
     void deleteDocument(String id) throws Exception;
-
-    DocumentsInfo.DocumentsDTO searchDocuments(String value);
-
 }

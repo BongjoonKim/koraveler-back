@@ -90,6 +90,23 @@ public class BlogController {
         }
     }
 
+    @GetMapping("/ps/search/documents")
+    public DocumentsInfo searchDocuments(
+            @RequestParam("value") String value,
+            @RequestParam("page") int page,
+            @RequestParam("size") int size,
+            @RequestParam("folderId") String folderId,
+            @RequestParam("type") String type,
+            @RequestParam("dateSort") String dateSort
+    ) {
+        try {
+            return blogService.searchDocuments(value, new PaginationDTO(page, size, folderId, type, dateSort));
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw new ResponseStatusException(HttpStatus.valueOf("error"), e.getMessage());
+        }
+    }
+
     @GetMapping("/ps/document")
     public DocumentsInfo.DocumentsDTO getDocument(
         @RequestParam("id") String id
