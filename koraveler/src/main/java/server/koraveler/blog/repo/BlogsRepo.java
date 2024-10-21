@@ -17,12 +17,10 @@ import server.koraveler.blog.model.Documents;
 import java.util.List;
 
 @Repository
-@Primary
-@Qualifier("BlogsRepo")
 public interface BlogsRepo extends MongoRepository<Documents, String> {
     @Override
     long count();
 
     Page<Documents> findAllByDraftIsFalseOrDraftIsNull(Pageable pageable);
-    Page<Documents> findAllByTitleContainingOrContentsContaining(String value, Pageable pageable);
+    Page<Documents> findAllByTitleContainingIgnoreCaseOrContentsContainingIgnoreCase(String titleValue, String contentsValue, Pageable pageable);
 }

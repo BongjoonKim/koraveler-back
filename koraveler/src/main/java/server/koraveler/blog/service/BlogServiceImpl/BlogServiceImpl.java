@@ -214,16 +214,21 @@ public class BlogServiceImpl implements BlogService {
     @Override
     public DocumentsInfo searchDocuments(String value, PaginationDTO pageDTO) throws Exception {
         try {
-            Pageable pageable = PageRequest.of(pageDTO.getPage(), pageDTO.getSize());
+            Sort.Order updatedSort = "ASC".equals(pageDTO.getDateSort()) ? Sort.Order.asc("updated") : Sort.Order.desc("updated");
+            Sort sort = Sort.by(updatedSort);
+            Pageable pageable = PageRequest.of(pageDTO.getPage(), pageDTO.getSize(), sort);
 
-
-            Page<Documents> documents = blogsRepo.findAllByTitleContainingOrContentsContaining(value, pageable);
+            Page<Documents> documents = blogsRepo.findAllByTitleContainingIgnoreCaseOrContentsContainingIgnoreCase(value, value, pageable);
 
             List<DocumentsInfo.DocumentsDTO> documentsDTO = new ArrayList<>();
             DocumentsInfo documentsInfo = new DocumentsInfo();
 
             if (!ObjectUtils.isEmpty(documents.getContent())) {
-                BeanUtils.copyProperties(documents.getContent(), documentsDTO);
+                documents.getContent().stream().forEach(content -> {
+                    DocumentsInfo.DocumentsDTO documentDTO = new DocumentsInfo.DocumentsDTO();
+                    BeanUtils.copyProperties(content, documentDTO);
+                    documentsDTO.add(documentDTO);
+                });
                 documentsInfo.setDocumentsDTO(documentsDTO);
                 documentsInfo.setTotalDocsCnt(documents.getTotalElements());
                 documentsInfo.setTotalPagesCnt(documents.getTotalPages());

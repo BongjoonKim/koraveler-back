@@ -94,13 +94,10 @@ public class BlogController {
     public DocumentsInfo searchDocuments(
             @RequestParam("value") String value,
             @RequestParam("page") int page,
-            @RequestParam("size") int size,
-            @RequestParam("folderId") String folderId,
-            @RequestParam("type") String type,
-            @RequestParam("dateSort") String dateSort
+            @RequestParam("size") int size
     ) {
         try {
-            return blogService.searchDocuments(value, new PaginationDTO(page, size, folderId, type, dateSort));
+            return blogService.searchDocuments(value, new PaginationDTO(page, size, null, null, null));
         } catch (Exception e) {
             e.printStackTrace();
             throw new ResponseStatusException(HttpStatus.valueOf("error"), e.getMessage());
