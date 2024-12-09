@@ -70,7 +70,7 @@ public class BlogServiceImpl implements BlogService {
             documents.setCreatedUser(username);
             documents.setUpdatedUser(username);
             Documents afterDocument = blogsRepo.save(documents);
-            elasticRepo.save(documents);
+//            elasticRepo.save(documents);
 
             DocumentsInfo.DocumentsDTO newDocDTO = new DocumentsInfo.DocumentsDTO();
             BeanUtils.copyProperties(afterDocument, newDocDTO);
