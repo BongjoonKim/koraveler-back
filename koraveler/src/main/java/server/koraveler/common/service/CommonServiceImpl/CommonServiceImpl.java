@@ -19,7 +19,7 @@ public class CommonServiceImpl implements CommonService {
     public String getWeatherData() throws Exception {
         RestTemplate restTemplate = new RestTemplate();
 
-        String url = weatherUrl + "/current?access_key=" + weatherKey + "&query=Seoul";
+        String url = weatherUrl + "?appid=" + weatherKey + "&q=Seoul,kr";
         try {
             ResponseEntity<String> resData = restTemplate.getForEntity(url, String.class);
             return resData.getBody();
