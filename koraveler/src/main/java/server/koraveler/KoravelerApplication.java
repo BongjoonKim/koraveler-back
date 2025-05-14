@@ -10,7 +10,8 @@ import org.springframework.data.mongodb.repository.config.EnableMongoRepositorie
         "server.koraveler.blog.repo",
         "server.koraveler.users.repo",
         "server.koraveler.menus.repo",
-        "server.koraveler.connections.bookmarks.repo"
+        "server.koraveler.connections.bookmarks.repo",
+        "server.koraveler.folders.repo"
 })
 @SpringBootApplication
 public class KoravelerApplication {

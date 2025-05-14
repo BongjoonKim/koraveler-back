@@ -2,9 +2,11 @@ package server.koraveler.folders.service;
 
 import server.koraveler.folders.dto.FoldersDTO;
 
+import java.util.List;
+
 public interface FolderService {
     FoldersDTO createFolder(FoldersDTO foldersDTO);
     FoldersDTO saveFolder(FoldersDTO foldersDTO);
-    FoldersDTO getFolder(String id);
+    List<FoldersDTO> getAllLoginUserFolders();
     void deleteFolder(String id);
 }
