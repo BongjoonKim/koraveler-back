@@ -18,7 +18,7 @@ import server.koraveler.users.model.Users;
 import server.koraveler.users.repo.UsersRepo;
 
 import java.time.LocalDateTime;
-import java.util.List;
+import java.util.*;
 
 @Service
 public class FolderServiceImpl implements FolderService {
@@ -55,19 +55,11 @@ public class FolderServiceImpl implements FolderService {
 
                 if (folders.getParentId() == null) {
                     folders.setParentId(users.getId());
-                    folders.setPath(users.getId());
-                } else {
-                    Folders parentFolders = foldersRepo.findById(folders.getParentId()).isPresent() ? foldersRepo.findById(folders.getParentId()).get() : null;
-                    if (!ObjectUtils.isEmpty(parentFolders)) {
-                        folders.setPath(parentFolders.getPath() + "/" + parentFolders.getId());
-                    }
+                    folders.setPath("/" + users.getId());
                 }
-
                 Folders result = foldersRepo.save(folders);
-
                 FoldersDTO newFoldersDTO = new FoldersDTO();
                 BeanUtils.copyProperties(result, newFoldersDTO);
-
                 return newFoldersDTO;
             }
         }
@@ -93,19 +85,11 @@ public class FolderServiceImpl implements FolderService {
 
                 if (folders.getParentId() == null) {
                     folders.setParentId(users.getId());
-                    folders.setPath(users.getId());
-                } else {
-                    Folders parentFolders = foldersRepo.findById(folders.getParentId()).isPresent() ? foldersRepo.findById(folders.getParentId()).get() : null;
-                    if (!ObjectUtils.isEmpty(parentFolders)) {
-                        folders.setPath(parentFolders.getPath() + "/" + parentFolders.getId());
-                    }
+                    folders.setPath("/" + users.getId());
                 }
-
                 Folders result = foldersRepo.save(folders);
-
                 FoldersDTO newFoldersDTO = new FoldersDTO();
                 BeanUtils.copyProperties(result, newFoldersDTO);
-
                 return newFoldersDTO;
             }
         }
@@ -113,23 +97,85 @@ public class FolderServiceImpl implements FolderService {
     }
 
     @Override
-    public List<FoldersDTO> getAllLoginUserFolders() {
+    public Map<String, Object> getAllLoginUserFolders() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication != null && authentication.getPrincipal() != null) {
             UserDetails userDetails = (UserDetails) authentication.getPrincipal();
             String username = userDetails.getUsername();
             Users users = usersRepo.findByUserId(username);
 
-            List<Folders> allFolders = foldersRepo.findByPathRegex("^" + users.getId() + "/.*");
+            List<Folders> allFolders = foldersRepo.findByPathRegex("^/" + users.getId() + "*");
 
-            return allFolders.stream()
-                    .map(folder -> {
-                        FoldersDTO foldersDTO = new FoldersDTO();
-                        BeanUtils.copyProperties(folder, foldersDTO);
-                        return foldersDTO;
-                    }).toList();
+            return buildFolderTree(allFolders, users.getId());
         }
-        return null;
+        return Collections.emptyMap();
+    }
+
+    private Map<String, Object> buildFolderTree(List<Folders> folders, String userId) {
+        Map<String, Object> result = new HashMap<>();
+
+        // 루트 폴더 생성 (가상 폴더)
+        Map<String, Object> rootFolder = new HashMap<>();
+        rootFolder.put("index", "root");
+        rootFolder.put("isFolder", true);
+        rootFolder.put("data", "Root");
+        rootFolder.put("children", new ArrayList<>());
+        result.put("root", rootFolder);
+
+        // 폴더별 자식 관계 매핑을 위한 Map
+        Map<String, List<String>> parentChildMap = new HashMap<>();
+
+        // 각 폴더를 result에 추가하고 부모-자식 관계 매핑
+        for (Folders folder : folders) {
+            // 폴더 데이터 생성
+            Map<String, Object> folderData = new HashMap<>();
+            folderData.put("index", folder.getId());
+            folderData.put("isFolder", true);
+            folderData.put("data", folder);
+            folderData.put("children", new ArrayList<>());
+
+            // 추가 메타데이터 (필요시)
+            folderData.put("description", folder.getDescription());
+            folderData.put("created", folder.getCreated());
+            folderData.put("updated", folder.getUpdated());
+
+            result.put(folder.getId(), folderData);
+
+            // 부모-자식 관계 매핑
+            String parentKey = determineParentKey(folder, userId);
+            parentChildMap.computeIfAbsent(parentKey, k -> new ArrayList<>()).add(folder.getId());
+        }
+
+        // 자식 관계 설정
+        for (Map.Entry<String, List<String>> entry : parentChildMap.entrySet()) {
+            String parentKey = entry.getKey();
+            List<String> children = entry.getValue();
+
+            if (result.containsKey(parentKey)) {
+                ((List<String>) ((Map<String, Object>) result.get(parentKey)).get("children")).addAll(children);
+            }
+        }
+
+        return result;
+    }
+
+    private String determineParentKey(Folders folder, String userId) {
+        String path = folder.getPath();
+
+        // path가 "/" + userId 형태면 루트의 직접 자식
+        if (path.equals("/" + userId)) {
+            return "root";
+        }
+
+        // path에서 마지막 "/" 이후의 ID를 부모 ID로 사용
+        String[] pathParts = path.split("/");
+        if (pathParts.length >= 2) {
+            // 마지막 부분이 부모 ID
+            return pathParts[pathParts.length - 1];
+        }
+
+        // 기본적으로 루트의 자식으로 처리
+        return "root";
     }
 
     @Override
