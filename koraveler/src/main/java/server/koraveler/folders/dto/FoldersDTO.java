@@ -5,5 +5,5 @@ import server.koraveler.folders.model.Folders;
 
 @Data
 public class FoldersDTO extends Folders {
-
+    private FoldersDTO parentFolder;
 }

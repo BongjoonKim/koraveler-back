@@ -6,7 +6,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import server.koraveler.blog.service.BlogService;
 import server.koraveler.folders.dto.FoldersDTO;
 import server.koraveler.folders.service.FolderService;
 
@@ -28,12 +27,24 @@ public class FoldersController {
         }
     }
 
+    @GetMapping("/parent")
+    public ResponseEntity<?> getParentFolder(
+            @RequestParam("child-id") String childFolderId
+    ) {
+        try {
+            return ResponseEntity.ok(folderService.getParentFolder(childFolderId));
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.ofNullable(null);
+        }
+    }
+
     @PostMapping("")
     public ResponseEntity<?> createFolder(
         @RequestBody FoldersDTO foldersDTO
     ) {
         try {
-            return ResponseEntity.ok(folderService.createFolder(foldersDTO));
+            return ResponseEntity.ok(folderService.saveFolder(foldersDTO));
         } catch (Exception e) {
             e.printStackTrace();
             return ResponseEntity.ofNullable(null);

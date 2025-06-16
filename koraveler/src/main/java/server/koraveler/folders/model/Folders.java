@@ -30,5 +30,5 @@ public class Folders extends CommonDTO {
 
     private boolean isPublic;
 
-    private String description;
+    private String description;;
 }

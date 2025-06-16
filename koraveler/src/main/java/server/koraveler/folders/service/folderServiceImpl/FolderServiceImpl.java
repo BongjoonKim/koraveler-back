@@ -35,69 +35,51 @@ public class FolderServiceImpl implements FolderService {
     private BlogsRepo blogsRepo;
 
     @Override
-    public FoldersDTO createFolder(FoldersDTO foldersDTO) {
-        Folders folders = new Folders();
-        BeanUtils.copyProperties(foldersDTO, folders);
-        LocalDateTime now = LocalDateTime.now();
+    public FoldersDTO saveFolder(FoldersDTO foldersDTO) throws Exception {
+        try {
+            Folders folders = new Folders();
+            BeanUtils.copyProperties(foldersDTO, folders);
+            LocalDateTime now = LocalDateTime.now();
 
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication != null && authentication.getPrincipal() != null) {
-            UserDetails userDetails = (UserDetails) authentication.getPrincipal();
-            String username = userDetails.getUsername();
-            Users users = usersRepo.findByUserId(username);
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            if (authentication != null && authentication.getPrincipal() != null) {
+                UserDetails userDetails = (UserDetails) authentication.getPrincipal();
+                String username = userDetails.getUsername();
+                Users users = usersRepo.findByUserId(username);
 
-            if (!ObjectUtils.isEmpty(users)) {
-                folders.setCreatedUser(username);
-                folders.setCreated(now);
-                folders.setUpdatedUser(username);
-                folders.setUpdated(now);
-                folders.setUserId(username);
+                if (!ObjectUtils.isEmpty(users)) {
+                    folders.setCreatedUser(username);
+                    folders.setCreated(now);
+                    folders.setUpdatedUser(username);
+                    folders.setUpdated(now);
+                    folders.setUserId(username);
 
-                if (folders.getParentId() == null) {
-                    folders.setParentId(users.getId());
-                    folders.setPath("/" + users.getId());
+                    // 최상위가 Root폴더인 경우
+                    if (folders.getParentId() == null) {
+                        folders.setParentId(users.getId());
+                        folders.setPath("/" + users.getId());
+                    // 최상위 폴더가 일반 폴더인 경우
+                    } else {
+                        Folders parentFolder = foldersRepo.findById(folders.getParentId()).get();
+                        if (parentFolder == null) {
+                            throw new Exception("there is no parent Folder");
+                        }
+                        folders.setPath(parentFolder.getPath() + "/" + parentFolder.getId());
+                    }
+                    Folders result = foldersRepo.save(folders);
+                    FoldersDTO newFoldersDTO = new FoldersDTO();
+                    BeanUtils.copyProperties(result, newFoldersDTO);
+                    return newFoldersDTO;
                 }
-                Folders result = foldersRepo.save(folders);
-                FoldersDTO newFoldersDTO = new FoldersDTO();
-                BeanUtils.copyProperties(result, newFoldersDTO);
-                return newFoldersDTO;
             }
+            return null;
+        } catch (Exception e) {
+            throw e;
         }
-        return null;
     }
 
     @Override
-    public FoldersDTO saveFolder(FoldersDTO foldersDTO) {
-        Folders folders = new Folders();
-        BeanUtils.copyProperties(foldersDTO, folders);
-        LocalDateTime now = LocalDateTime.now();
-
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication != null && authentication.getPrincipal() != null) {
-            UserDetails userDetails = (UserDetails) authentication.getPrincipal();
-            String username = userDetails.getUsername();
-            Users users = usersRepo.findByUserId(username);
-
-            if (!ObjectUtils.isEmpty(users)) {
-                folders.setUpdatedUser(username);
-                folders.setUpdated(now);
-                folders.setUserId(username);
-
-                if (folders.getParentId() == null) {
-                    folders.setParentId(users.getId());
-                    folders.setPath("/" + users.getId());
-                }
-                Folders result = foldersRepo.save(folders);
-                FoldersDTO newFoldersDTO = new FoldersDTO();
-                BeanUtils.copyProperties(result, newFoldersDTO);
-                return newFoldersDTO;
-            }
-        }
-        return null;
-    }
-
-    @Override
-    public Map<String, Object> getAllLoginUserFolders() {
+    public Map<String, Object>  getAllLoginUserFolders() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication != null && authentication.getPrincipal() != null) {
             UserDetails userDetails = (UserDetails) authentication.getPrincipal();
@@ -257,5 +239,28 @@ public class FolderServiceImpl implements FolderService {
 
         // 최종적으로 폴더 삭제
         foldersRepo.deleteById(id);
+    }
+
+    @Override
+    public FoldersDTO getParentFolder(String childId) throws Exception {
+        try {
+            Folders folders = foldersRepo.findById(childId).get();
+            if (folders == null) {
+                throw new Exception("there is no folder");
+            }
+            Folders parentFolder = foldersRepo.findById(folders.getParentId()).get();
+            if (parentFolder == null) {
+                throw new Exception("there is no parent folder");
+            }
+            FoldersDTO childFolerDTO = new FoldersDTO();
+            BeanUtils.copyProperties(folders, childFolerDTO);
+
+            FoldersDTO parentFolderDTO = new FoldersDTO();
+            BeanUtils.copyProperties(parentFolder, parentFolderDTO);
+            childFolerDTO.setParentFolder(parentFolderDTO);
+            return childFolerDTO;
+        } catch (Exception e) {
+            throw e;
+        }
     }
 }

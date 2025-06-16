@@ -69,8 +69,11 @@ public class BlogServiceImpl implements BlogService {
             String username = userDetails.getUsername();
             documents.setCreatedUser(username);
             documents.setUpdatedUser(username);
+            if (documents.getFolderId() == null) {
+                Users users = usersRepo.findByUserId(username);
+                documents.setFolderId(users.getId());
+            }
             Documents afterDocument = blogsRepo.save(documents);
-//            elasticRepo.save(documents);
 
             DocumentsInfo.DocumentsDTO newDocDTO = new DocumentsInfo.DocumentsDTO();
             BeanUtils.copyProperties(afterDocument, newDocDTO);
@@ -95,8 +98,11 @@ public class BlogServiceImpl implements BlogService {
                 System.out.println("userDetails = " + userDetails);
                 String username = userDetails.getUsername();
                 documents.setUpdatedUser(username);
+                if (documents.getFolderId() == null) {
+                    Users users = usersRepo.findByUserId(username);
+                    documents.setFolderId(users.getId());
+                }
                 Documents afterDocument = blogsRepo.save(documents);
-                elasticRepo.save(documents);
 
                 DocumentsInfo.DocumentsDTO newDocDTO = new DocumentsInfo.DocumentsDTO();
                 BeanUtils.copyProperties(afterDocument, newDocDTO);
@@ -202,7 +208,7 @@ public class BlogServiceImpl implements BlogService {
             }).collect(Collectors.toList());
 
             DocumentsInfo documentsInfo = new DocumentsInfo();
-            documentsInfo.setDocumentsDTO(documentsDTO);
+            documentsInfo.setDocuments(documentsDTO);
             documentsInfo.setTotalPagesCnt(documents.getTotalPages());
             documentsInfo.setTotalDocsCnt(documents.getTotalElements());
             return documentsInfo;
@@ -229,7 +235,7 @@ public class BlogServiceImpl implements BlogService {
                     BeanUtils.copyProperties(content, documentDTO);
                     documentsDTO.add(documentDTO);
                 });
-                documentsInfo.setDocumentsDTO(documentsDTO);
+                documentsInfo.setDocuments(documentsDTO);
                 documentsInfo.setTotalDocsCnt(documents.getTotalElements());
                 documentsInfo.setTotalPagesCnt(documents.getTotalPages());
             }
