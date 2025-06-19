@@ -11,6 +11,4 @@ public class CommonDTO {
     private String createdUser;
     private String updatedUser;
     private String uniqKey;
-
-
 }

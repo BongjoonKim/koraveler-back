@@ -21,7 +21,6 @@ import server.koraveler.blog.dto.DocumentsInfo;
 import server.koraveler.blog.dto.PaginationDTO;
 import server.koraveler.blog.model.Documents;
 import server.koraveler.blog.repo.BlogsRepo;
-import server.koraveler.blog.elastic.ElasticRepo;
 import server.koraveler.blog.service.BlogService;
 import server.koraveler.connections.bookmarks.repo.BookmarksRepo;
 import server.koraveler.users.model.Users;
@@ -46,12 +45,6 @@ public class BlogServiceImpl implements BlogService {
 
     @Autowired
     private BookmarksRepo bookmarksRepo;
-
-    @Autowired
-    private ElasticRepo elasticRepo;
-
-    @Autowired
-    private ElasticsearchTemplate elasticsearchTemplate;
 
     @Override
     public DocumentsInfo.DocumentsDTO createDocument(DocumentsInfo.DocumentsDTO documentsDTO) {
@@ -255,7 +248,6 @@ public class BlogServiceImpl implements BlogService {
         documents.setThumbnailImgUrl(newData.getThumbnailImgUrl());
 
         Documents newDocument = blogsRepo.save(documents);
-        elasticRepo.save(documents);
         DocumentsInfo.DocumentsDTO newDocumentDTO = new DocumentsInfo.DocumentsDTO();
         BeanUtils.copyProperties(newDocument, newDocumentDTO);
 
