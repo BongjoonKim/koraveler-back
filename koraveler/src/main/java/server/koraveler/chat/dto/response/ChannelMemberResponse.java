@@ -18,15 +18,15 @@ public class ChannelMemberResponse {
     private String id;
     private String userId;
     private String nickname;
-    private String userRealName; // 조인해서 가져올 데이터
-    private String userAvatarUrl; // 조인해서 가져올 데이터
     private MemberStatus status;
-    private String role; // 권한 정보
-    private Boolean isOnline; // 온라인 상태
     private LocalDateTime joinedAt;
     private LocalDateTime lastSeenAt;
     private String lastReadMessageId;
     private NotificationLevel notificationLevel;
     private Boolean isMuted;
     private LocalDateTime mutedUntil;
+    private UserSummary user;
+    private String roleId;
+    private String roleName;
+    private Boolean isOnline;
 }

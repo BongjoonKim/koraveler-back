@@ -17,9 +17,7 @@ public class AttachmentResponse {
     private String fileUrl;
     private String mimeType;
     private Long fileSize;
-    private String formattedFileSize; // "1.2MB" 형태
     private Integer width;
     private Integer height;
     private Integer duration;
-    private String thumbnailUrl; // 썸네일 URL
 }

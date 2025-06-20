@@ -37,4 +37,7 @@ public class MessageResponse {
     private Integer unreadCount; // 이 메시지를 안 읽은 사람 수
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private UserSummary author;
+    private Integer replyCount;
+    private Boolean isMyMessage;
 }

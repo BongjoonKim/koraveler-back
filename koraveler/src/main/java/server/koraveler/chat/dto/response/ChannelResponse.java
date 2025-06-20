@@ -23,14 +23,14 @@ public class ChannelResponse {
     private String topic;
     private List<String> tags;
     private Integer memberCount;
-    private Integer unreadMessageCount; // 사용자별 안 읽은 메시지 수
-    private MessageResponse lastMessage; // 마지막 메시지
     private LocalDateTime lastMessageAt;
     private Boolean isArchived;
     private Boolean isReadOnly;
-    private Boolean isMember; // 현재 사용자의 멤버 여부
-    private Boolean isMuted; // 현재 사용자의 음소거 여부
-    private String myRole; // 현재 사용자의 역할
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private Boolean isMember;
+    private Boolean isMuted;
+    private Integer unreadMessageCount;
+    private String myRole;
+    private MessageResponse lastMessage;
 }

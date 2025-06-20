@@ -12,7 +12,6 @@ import java.time.LocalDateTime;
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
-@Builder
 public class MessageSearchRequest extends PageRequest {
     private String keyword; // 검색 키워드
     private String userId; // 특정 사용자 메시지만

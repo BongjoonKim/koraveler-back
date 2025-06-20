@@ -1,4 +1,4 @@
-package server.koraveler.chat.model.entity;
+package server.koraveler.chat.model.entities;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;

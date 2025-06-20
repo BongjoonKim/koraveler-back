@@ -4,7 +4,7 @@ package server.koraveler.chat.dto.mapper;
 import org.springframework.stereotype.Component;
 import server.koraveler.chat.dto.request.ChannelCreateRequest;
 import server.koraveler.chat.dto.response.ChannelResponse;
-import server.koraveler.chat.model.entity.Channels;
+import server.koraveler.chat.model.entities.Channels;
 
 import java.time.LocalDateTime;
 
