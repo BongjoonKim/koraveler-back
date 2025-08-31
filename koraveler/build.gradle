@@ -56,7 +56,3 @@ dependencies {
     // STOMP 웹소켓 지원
     implementation 'org.springframework.boot:spring-boot-starter-websocket'
 }
-
-tasks.named('test') {
-    useJUnitPlatform()
-}
