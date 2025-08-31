@@ -70,36 +70,39 @@ jobs:
             echo "Stopping existing applications..."
             echo "========================================="
           
-            # 기존 프로세스 종료
+            # 기존 프로세스 종료 (권한 문제 해결)
             PIDS=$(ps -ef | grep "koraveler-0.0.1-SNAPSHOT.jar" | grep -v grep | awk '{print $2}')
             if [ ! -z "$PIDS" ]; then
               for PID in $PIDS; do
-                echo "Killing process $PID"
-                kill -9 $PID
+                # 프로세스 소유자 확인 후 종료
+                if ps -p $PID > /dev/null 2>&1; then
+                  echo "Attempting to kill process $PID"
+                  kill -9 $PID 2>/dev/null || echo "Could not kill process $PID (may need different permissions)"
+                fi
               done
               sleep 2
             fi
           
             # 포트 3003을 사용 중인 프로세스 종료
-            PORT_PID=$(lsof -ti:3003)
+            PORT_PID=$(lsof -ti:3003 2>/dev/null)
             if [ ! -z "$PORT_PID" ]; then
               echo "Killing process using port 3003: $PORT_PID"
-              kill -9 $PORT_PID
+              kill -9 $PORT_PID 2>/dev/null || echo "Could not kill process on port 3003"
               sleep 2
             fi
           
-            # start.sh 스크립트 생성 (없는 경우)
+            # start.sh 스크립트 생성 (EOF 사용으로 변경)
             if [ ! -f ~/koraveler-back/koraveler/start.sh ]; then
               echo "Creating start.sh script..."
-              cat > ~/koraveler-back/koraveler/start.sh << 'SCRIPT'
+              cat > ~/koraveler-back/koraveler/start.sh << 'EOF'
                 #!/bin/bash
                 APP_DIR="/home/ubuntu/koraveler-back/koraveler"
                 JAR_FILE="$APP_DIR/build/libs/koraveler-0.0.1-SNAPSHOT.jar"
                 LOG_DIR="$APP_DIR/logs"
                 PID_FILE="$APP_DIR/app.pid"
-
+          
                 mkdir -p $LOG_DIR
-
+          
                 # 기존 프로세스 종료
                 if [ -f $PID_FILE ]; then
                   OLD_PID=$(cat $PID_FILE)
@@ -109,15 +112,15 @@ jobs:
                     sleep 2
                   fi
                 fi
-
+          
                 # 포트 확인 및 종료
-                PORT_PID=$(lsof -ti:3003)
+                PORT_PID=$(lsof -ti:3003 2>/dev/null)
                 if [ ! -z "$PORT_PID" ]; then
                   echo "Killing process using port 3003: $PORT_PID"
                   kill -9 $PORT_PID
                   sleep 2
                 fi
-
+          
                 # 애플리케이션 시작
                 echo "Starting Koraveler application..."
                 nohup java -Xmx512m -Xms256m -Dspring.profiles.active=prod -jar $JAR_FILE > $LOG_DIR/koraveler.log 2>&1 &
@@ -126,8 +129,8 @@ jobs:
                 echo $! > $PID_FILE
                 echo "Application started with PID: $(cat $PID_FILE)"
                 echo "Logs: $LOG_DIR/koraveler.log"
-              SCRIPT
-
+              EOF
+          
               chmod +x ~/koraveler-back/koraveler/start.sh
             fi
           
@@ -148,7 +151,7 @@ jobs:
                 echo "✅ Application started successfully!"
                 echo "========================================="
                 echo "PID: $PID"
-
+          
                 # 포트 확인
                 sleep 2
                 if lsof -Pi :3003 -sTCP:LISTEN -t > /dev/null 2>&1; then
@@ -157,18 +160,18 @@ jobs:
                 else
                   echo "⚠️ Warning: Port 3003 is not listening yet (may still be starting)"
                 fi
-
+          
                 echo ""
                 echo "Recent application logs:"
-                tail -n 20 ~/koraveler-back/koraveler/logs/koraveler.log
-
+                tail -n 20 ~/koraveler-back/koraveler/logs/koraveler.log || echo "Log file not available yet"
+          
                 echo ""
                 echo "========================================="
                 echo "✅ Deployment completed successfully!"
                 echo "========================================="
               else
                 echo "❌ Process died immediately after starting!"
-                tail -n 50 ~/koraveler-back/koraveler/logs/koraveler.log
+                tail -n 50 ~/koraveler-back/koraveler/logs/koraveler.log 2>/dev/null || echo "No logs available"
                 exit 1
               fi
             else
