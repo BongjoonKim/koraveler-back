@@ -49,6 +49,12 @@ dependencies {
 //    implementation 'com.auth0:java-jwt:4.0.0'
 
     implementation 'org.springframework.cloud:spring-cloud-starter-aws:2.2.6.RELEASE'
+
+    // Spring WebSocket 의존성
+    implementation 'org.springframework.boot:spring-boot-starter-websocket'
+
+    // STOMP 웹소켓 지원
+    implementation 'org.springframework.boot:spring-boot-starter-websocket'
 }
 
 tasks.named('test') {

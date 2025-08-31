@@ -1,0 +1,192 @@
+name: Deploy to EC2
+
+on:
+  push:
+    branches: [ master ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v3
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Build with Gradle
+        run: ./gradlew build
+
+      - name: Deploy to EC2
+        env:
+          PRIVATE_KEY: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
+          HOST: ${{ secrets.EC2_HOST }}
+          USER: ${{ secrets.EC2_USER }}
+        run: |
+          # SSH 키 설정
+          echo "$PRIVATE_KEY" > private_key.pem
+          chmod 600 private_key.pem
+          
+          # SSH 설정 (호스트 키 확인 비활성화)
+          mkdir -p ~/.ssh
+          ssh-keyscan -H $HOST >> ~/.ssh/known_hosts
+          
+          # 빌드된 JAR 파일 EC2로 복사
+          scp -i private_key.pem build/libs/koraveler-0.0.1-SNAPSHOT.jar $USER@$HOST:~/koraveler-back/koraveler/build/libs/
+          
+          # EC2에서 배포 및 서비스 설정 실행
+          ssh -i private_key.pem $USER@$HOST << 'ENDSSH'
+            cd ~/koraveler-back/koraveler
+          
+            # 로그 디렉토리 생성 (없는 경우)
+            mkdir -p ~/koraveler-back/koraveler/logs
+          
+            # Git pull (최신 코드 가져오기)
+            echo "========================================="
+            echo "Fetching latest code from git..."
+            echo "========================================="
+            git fetch --all
+            git reset --hard origin/master
+            git pull
+          
+            # 기존 프로세스 종료 (모든 관련 프로세스 종료)
+            echo "========================================="
+            echo "Stopping existing applications..."
+            echo "========================================="
+          
+            # 1. systemd 서비스로 실행 중인 경우 중지
+            if systemctl is-active --quiet koraveler.service; then
+              echo "Stopping systemd service..."
+              sudo systemctl stop koraveler.service
+              sleep 2
+            fi
+          
+            # 2. nohup으로 실행 중인 프로세스 종료
+            PIDS=$(ps -ef | grep "koraveler-0.0.1-SNAPSHOT.jar" | grep -v grep | awk '{print $2}')
+            if [ ! -z "$PIDS" ]; then
+              for PID in $PIDS; do
+                echo "Killing process $PID"
+                kill -9 $PID
+              done
+              sleep 2
+            fi
+          
+            # 3. 포트 3003을 사용 중인 프로세스 종료
+            PORT_PID=$(lsof -ti:3003)
+            if [ ! -z "$PORT_PID" ]; then
+              echo "Killing process using port 3003: $PORT_PID"
+              kill -9 $PORT_PID
+              sleep 2
+            fi
+          
+            # Systemd 서비스 파일 생성/업데이트
+            echo "========================================="
+            echo "Setting up systemd service for auto-start..."
+            echo "========================================="
+          
+            # 서비스 파일 생성
+            sudo tee /etc/systemd/system/koraveler.service > /dev/null << 'EOF'
+  [Unit]
+  Description=Koraveler Spring Boot Application
+  After=network.target
+  
+  [Service]
+  Type=simple
+  User=ubuntu
+  Group=ubuntu
+  WorkingDirectory=/home/ubuntu/koraveler-back/koraveler
+  ExecStart=/usr/bin/java -Xmx512m -Xms256m -jar /home/ubuntu/koraveler-back/koraveler/build/libs/koraveler-0.0.1-SNAPSHOT.jar
+  Restart=always
+  RestartSec=10
+  StandardOutput=append:/home/ubuntu/koraveler-back/koraveler/logs/koraveler.log
+  StandardError=append:/home/ubuntu/koraveler-back/koraveler/logs/koraveler-error.log
+  
+  # 환경 변수 설정
+  Environment="SPRING_PROFILES_ACTIVE=prod"
+  
+  # 프로세스 관리
+  KillMode=process
+  KillSignal=SIGTERM
+  TimeoutStopSec=20
+  
+  [Install]
+  WantedBy=multi-user.target
+  EOF
+  
+  # Systemd 리로드 및 서비스 활성화
+  sudo systemctl daemon-reload
+  sudo systemctl enable koraveler.service
+  
+  # 서비스 시작
+  echo "========================================="
+  echo "Starting application via systemd..."
+  echo "========================================="
+  sudo systemctl start koraveler.service
+  
+  # 실행 확인 (시작까지 대기)
+  sleep 8
+  
+  # 서비스 상태 확인
+  if sudo systemctl is-active --quiet koraveler.service; then
+  echo "========================================="
+  echo "✅ Application started successfully!"
+  echo "========================================="
+  echo ""
+  echo "Service status:"
+  sudo systemctl status koraveler.service --no-pager --lines=10
+  echo ""
+  echo "Recent application logs:"
+  if [ -f ~/koraveler-back/koraveler/logs/koraveler.log ]; then
+  tail -n 20 ~/koraveler-back/koraveler/logs/koraveler.log
+  else
+  sudo journalctl -u koraveler.service -n 20 --no-pager
+  fi
+  
+  # 포트 확인
+  echo ""
+  echo "Port check:"
+  sleep 2
+  if lsof -Pi :3003 -sTCP:LISTEN -t > /dev/null 2>&1; then
+  echo "✅ Port 3003 is listening"
+echo "Application URL: http://$HOST:3003"
+  else
+echo "⚠️ Warning: Port 3003 is not listening yet (may still be starting)"
+  fi
+  
+  echo ""
+  echo "========================================="
+  echo "✅ Deployment completed successfully!"
+  echo "✅ Auto-start on boot is ENABLED"
+  echo "========================================="
+  echo ""
+  echo "Useful commands:"
+echo "  Check status:  sudo systemctl status koraveler"
+echo "  View logs:     sudo journalctl -u koraveler -f"
+echo "  Restart:       sudo systemctl restart koraveler"
+echo "  Stop:          sudo systemctl stop koraveler"
+  
+  else
+  echo "========================================="
+  echo "❌ Application failed to start!"
+  echo "========================================="
+  echo ""
+  echo "System logs:"
+  sudo journalctl -u koraveler.service -n 50 --no-pager
+  echo ""
+  echo "Error logs:"
+  if [ -f ~/koraveler-back/koraveler/logs/koraveler-error.log ]; then
+  tail -n 50 ~/koraveler-back/koraveler/logs/koraveler-error.log
+  fi
+  exit 1
+  fi
+  ENDSSH
+  
+  # 키 파일 삭제
+  rm -f private_key.pem
