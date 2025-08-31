@@ -7,6 +7,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
+import server.koraveler.blog.dto.DocumentsDTO;
 import server.koraveler.blog.dto.DocumentsInfo;
 import server.koraveler.blog.dto.PaginationDTO;
 import server.koraveler.blog.service.BlogService;
@@ -25,10 +26,10 @@ public class BlogController {
     // 글 생성
     @PostMapping("/document")
     public ResponseEntity<?> createDocument (
-            @RequestBody DocumentsInfo.DocumentsDTO data
+            @RequestBody DocumentsDTO data
     ) {
         try {
-            DocumentsInfo.DocumentsDTO documentsDTO = blogService.createDocument(data);
+            DocumentsDTO documentsDTO = blogService.createDocument(data);
             return ResponseEntity.ok(documentsDTO);
         } catch (Exception e) {
             return null;
@@ -37,10 +38,10 @@ public class BlogController {
 
     @PutMapping("/document/content")
     public ResponseEntity<?> createAfterSaveDocument (
-            @RequestBody DocumentsInfo.DocumentsDTO data
+            @RequestBody DocumentsDTO data
     ) {
         try {
-            DocumentsInfo.DocumentsDTO documentsDTO = blogService.createAfterSaveDocument(data);
+            DocumentsDTO documentsDTO = blogService.createAfterSaveDocument(data);
             return ResponseEntity.ok(documentsDTO);
         } catch (Exception e) {
             return null;
@@ -49,10 +50,10 @@ public class BlogController {
 
     @PutMapping("/document")
     public ResponseEntity<?> saveDocument (
-            @RequestBody DocumentsInfo.DocumentsDTO data
+            @RequestBody DocumentsDTO data
     ) {
         try {
-            DocumentsInfo.DocumentsDTO documentsDTO = blogService.saveDocument(data);
+            DocumentsDTO documentsDTO = blogService.saveDocument(data);
             return ResponseEntity.ok(documentsDTO);
         } catch (Exception e) {
             return null;
@@ -105,7 +106,7 @@ public class BlogController {
     }
 
     @GetMapping("/ps/document")
-    public DocumentsInfo.DocumentsDTO getDocument(
+    public DocumentsDTO getDocument(
         @RequestParam("id") String id
     ) {
         try {

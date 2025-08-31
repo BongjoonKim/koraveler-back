@@ -8,6 +8,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 import org.springframework.util.ObjectUtils;
+import server.koraveler.blog.dto.DocumentsDTO;
 import server.koraveler.blog.dto.DocumentsInfo;
 import server.koraveler.blog.model.Documents;
 import server.koraveler.blog.repo.BlogsRepo;
@@ -101,7 +102,7 @@ public class ConBookmarksUsersDocumentsServiceImpl implements ConBookmarksUsersD
     }
 
     @Override
-    public List<DocumentsInfo.DocumentsDTO> getDocuments() throws Exception {
+    public List<DocumentsDTO> getDocuments() throws Exception {
         return null;
     }
 

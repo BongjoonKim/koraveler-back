@@ -15,6 +15,7 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 import org.springframework.util.ObjectUtils;
 import server.koraveler.blog.constants.BlogConstants;
+import server.koraveler.blog.dto.DocumentsDTO;
 import server.koraveler.blog.dto.DocumentsInfo;
 import server.koraveler.blog.dto.PaginationDTO;
 import server.koraveler.blog.model.Documents;
@@ -45,7 +46,7 @@ public class BlogServiceImpl implements BlogService {
     private BookmarksRepo bookmarksRepo;
 
     @Override
-    public DocumentsInfo.DocumentsDTO createDocument(DocumentsInfo.DocumentsDTO documentsDTO) {
+    public DocumentsDTO createDocument(DocumentsDTO documentsDTO) {
 
         Documents documents = new Documents();
         BeanUtils.copyProperties(documentsDTO, documents);
@@ -66,7 +67,7 @@ public class BlogServiceImpl implements BlogService {
             }
             Documents afterDocument = blogsRepo.save(documents);
 
-            DocumentsInfo.DocumentsDTO newDocDTO = new DocumentsInfo.DocumentsDTO();
+            DocumentsDTO newDocDTO = new DocumentsDTO();
             BeanUtils.copyProperties(afterDocument, newDocDTO);
 
             return newDocDTO;
@@ -75,7 +76,7 @@ public class BlogServiceImpl implements BlogService {
     }
 
     @Override
-    public DocumentsInfo.DocumentsDTO saveDocument(DocumentsInfo.DocumentsDTO documentsDTO) {
+    public DocumentsDTO saveDocument(DocumentsDTO documentsDTO) {
         try {
             Documents documents = new Documents();
             BeanUtils.copyProperties(documentsDTO, documents);
@@ -95,7 +96,7 @@ public class BlogServiceImpl implements BlogService {
                 }
                 Documents afterDocument = blogsRepo.save(documents);
 
-                DocumentsInfo.DocumentsDTO newDocDTO = new DocumentsInfo.DocumentsDTO();
+                DocumentsDTO newDocDTO = new DocumentsDTO();
                 BeanUtils.copyProperties(afterDocument, newDocDTO);
 
                 return newDocDTO;
@@ -192,8 +193,8 @@ public class BlogServiceImpl implements BlogService {
                     }
                 }
             }
-            List<DocumentsInfo.DocumentsDTO> documentsDTO = documents.getContent().stream().map(document -> {
-                DocumentsInfo.DocumentsDTO documentDTO = new DocumentsInfo.DocumentsDTO();
+            List<DocumentsDTO> documentsDTO = documents.getContent().stream().map(document -> {
+                DocumentsDTO documentDTO = new DocumentsDTO();
                 BeanUtils.copyProperties(document, documentDTO);
                 return documentDTO;
             }).collect(Collectors.toList());
@@ -217,12 +218,12 @@ public class BlogServiceImpl implements BlogService {
 
             Page<Documents> documents = blogsRepo.findAllByTitleContainingIgnoreCaseOrContentsContainingIgnoreCase(value, value, pageable);
 
-            List<DocumentsInfo.DocumentsDTO> documentsDTO = new ArrayList<>();
+            List<DocumentsDTO> documentsDTO = new ArrayList<>();
             DocumentsInfo documentsInfo = new DocumentsInfo();
 
             if (!ObjectUtils.isEmpty(documents.getContent())) {
                 documents.getContent().stream().forEach(content -> {
-                    DocumentsInfo.DocumentsDTO documentDTO = new DocumentsInfo.DocumentsDTO();
+                    DocumentsDTO documentDTO = new DocumentsDTO();
                     BeanUtils.copyProperties(content, documentDTO);
                     documentsDTO.add(documentDTO);
                 });
@@ -238,7 +239,7 @@ public class BlogServiceImpl implements BlogService {
     }
 
     @Override
-    public DocumentsInfo.DocumentsDTO createAfterSaveDocument(DocumentsInfo.DocumentsDTO newData) {
+    public DocumentsDTO createAfterSaveDocument(DocumentsDTO newData) {
         LocalDateTime now = LocalDateTime.now();
         Documents documents = blogsRepo.findById(newData.getId()).get();
 
@@ -246,17 +247,17 @@ public class BlogServiceImpl implements BlogService {
         documents.setThumbnailImgUrl(newData.getThumbnailImgUrl());
 
         Documents newDocument = blogsRepo.save(documents);
-        DocumentsInfo.DocumentsDTO newDocumentDTO = new DocumentsInfo.DocumentsDTO();
+        DocumentsDTO newDocumentDTO = new DocumentsDTO();
         BeanUtils.copyProperties(newDocument, newDocumentDTO);
 
         return newDocumentDTO;
     }
 
     @Override
-    public DocumentsInfo.DocumentsDTO getDocument(String id) throws Exception {
+    public DocumentsDTO getDocument(String id) throws Exception {
         try {
             Documents documents = blogsRepo.findById(id).get();
-            DocumentsInfo.DocumentsDTO documentsDTO = new DocumentsInfo.DocumentsDTO();
+            DocumentsDTO documentsDTO = new DocumentsDTO();
             BeanUtils.copyProperties(documents, documentsDTO);
             return documentsDTO;
         } catch (Exception e) {
