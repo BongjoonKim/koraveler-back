@@ -39,12 +39,12 @@ public class CorsConfig {
         configuration.setAllowedOrigins(allowedOriginPatterns);
 
         //허용하는 HTTP METHOD 지정
-        ArrayList<String> allowedHttpMethods = new ArrayList<>();
-        allowedHttpMethods.add("GET");
-        allowedHttpMethods.add("POST");
-        allowedHttpMethods.add("PUT");
-        allowedHttpMethods.add("DELETE");
-        configuration.setAllowedMethods(allowedHttpMethods);
+        // OPTIONS 메서드 포함
+        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD"));
+        configuration.setAllowedHeaders(Arrays.asList("*"));
+        configuration.setExposedHeaders(Arrays.asList("Authorization", "Content-Type"));
+        configuration.setAllowCredentials(true);
+        configuration.setMaxAge(3600L);
 
         configuration.setAllowedHeaders(Collections.singletonList("*"));
 //        configuration.setAllowedHeaders(List.of(HttpHeaders.AUTHORIZATION, HttpHeaders.CONTENT_TYPE));

@@ -64,7 +64,8 @@ public class SecurityConfig {
             .csrf(csrf -> csrf.disable())
             .formLogin(AbstractHttpConfigurer::disable)
             .authorizeHttpRequests(req -> req
-                .requestMatchers(new ContainsPsRequestMatcher()).permitAll()
+                    .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                    .requestMatchers(new ContainsPsRequestMatcher()).permitAll()
                 .anyRequest().authenticated()
             ).sessionManagement(session -> session
                 .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
