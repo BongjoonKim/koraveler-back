@@ -92,101 +92,101 @@ jobs:
             echo "========================================="
           
             # 서비스 파일 생성
-            sudo tee /etc/systemd/system/koraveler.service > /dev/null << 'EOF'
-  [Unit]
-  Description=Koraveler Spring Boot Application
-  After=network.target
-  
-  [Service]
-  Type=simple
-  User=ubuntu
-  Group=ubuntu
-  WorkingDirectory=/home/ubuntu/koraveler-back/koraveler
-  ExecStart=/usr/bin/java -Xmx512m -Xms256m -jar /home/ubuntu/koraveler-back/koraveler/build/libs/koraveler-0.0.1-SNAPSHOT.jar
-  Restart=always
-  RestartSec=10
-  StandardOutput=append:/home/ubuntu/koraveler-back/koraveler/logs/koraveler.log
-  StandardError=append:/home/ubuntu/koraveler-back/koraveler/logs/koraveler-error.log
-  
-  # 환경 변수 설정
-  Environment="SPRING_PROFILES_ACTIVE=prod"
-  
-  # 프로세스 관리
-  KillMode=process
-  KillSignal=SIGTERM
-  TimeoutStopSec=20
-  
-  [Install]
-  WantedBy=multi-user.target
-  EOF
-  
-  # Systemd 리로드 및 서비스 활성화
-  sudo systemctl daemon-reload
-  sudo systemctl enable koraveler.service
-  
-  # 서비스 시작
-  echo "========================================="
-  echo "Starting application via systemd..."
-  echo "========================================="
-  sudo systemctl start koraveler.service
-  
-  # 실행 확인 (시작까지 대기)
-  sleep 8
-  
-  # 서비스 상태 확인
-  if sudo systemctl is-active --quiet koraveler.service; then
-  echo "========================================="
-  echo "✅ Application started successfully!"
-  echo "========================================="
-  echo ""
-  echo "Service status:"
-  sudo systemctl status koraveler.service --no-pager --lines=10
-  echo ""
-  echo "Recent application logs:"
-  if [ -f ~/koraveler-back/koraveler/logs/koraveler.log ]; then
-  tail -n 20 ~/koraveler-back/koraveler/logs/koraveler.log
-  else
-  sudo journalctl -u koraveler.service -n 20 --no-pager
-  fi
-  
-  # 포트 확인
-  echo ""
-  echo "Port check:"
-  sleep 2
-  if lsof -Pi :3003 -sTCP:LISTEN -t > /dev/null 2>&1; then
-  echo "✅ Port 3003 is listening"
+            sudo tee /etc/systemd/system/koraveler.service > /dev/null <<EOF
+[Unit]
+Description=Koraveler Spring Boot Application
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/home/ubuntu/koraveler-back/koraveler
+ExecStart=/usr/bin/java -Xmx512m -Xms256m -jar /home/ubuntu/koraveler-back/koraveler/build/libs/koraveler-0.0.1-SNAPSHOT.jar
+Restart=always
+RestartSec=10
+StandardOutput=append:/home/ubuntu/koraveler-back/koraveler/logs/koraveler.log
+StandardError=append:/home/ubuntu/koraveler-back/koraveler/logs/koraveler-error.log
+
+# 환경 변수 설정
+Environment="SPRING_PROFILES_ACTIVE=prod"
+
+# 프로세스 관리
+KillMode=process
+KillSignal=SIGTERM
+TimeoutStopSec=20
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# Systemd 리로드 및 서비스 활성화
+sudo systemctl daemon-reload
+sudo systemctl enable koraveler.service
+
+# 서비스 시작
+echo "========================================="
+echo "Starting application via systemd..."
+echo "========================================="
+sudo systemctl start koraveler.service
+
+# 실행 확인 (시작까지 대기)
+sleep 8
+
+# 서비스 상태 확인
+if sudo systemctl is-active --quiet koraveler.service; then
+echo "========================================="
+echo "✅ Application started successfully!"
+echo "========================================="
+echo ""
+echo "Service status:"
+sudo systemctl status koraveler.service --no-pager --lines=10
+echo ""
+echo "Recent application logs:"
+if [ -f ~/koraveler-back/koraveler/logs/koraveler.log ]; then
+tail -n 20 ~/koraveler-back/koraveler/logs/koraveler.log
+else
+sudo journalctl -u koraveler.service -n 20 --no-pager
+fi
+
+# 포트 확인
+echo ""
+echo "Port check:"
+sleep 2
+if lsof -Pi :3003 -sTCP:LISTEN -t > /dev/null 2>&1; then
+echo "✅ Port 3003 is listening"
 echo "Application URL: http://$HOST:3003"
-  else
+else
 echo "⚠️ Warning: Port 3003 is not listening yet (may still be starting)"
-  fi
-  
-  echo ""
-  echo "========================================="
-  echo "✅ Deployment completed successfully!"
-  echo "✅ Auto-start on boot is ENABLED"
-  echo "========================================="
-  echo ""
-  echo "Useful commands:"
+fi
+
+echo ""
+echo "========================================="
+echo "✅ Deployment completed successfully!"
+echo "✅ Auto-start on boot is ENABLED"
+echo "========================================="
+echo ""
+echo "Useful commands:"
 echo "  Check status:  sudo systemctl status koraveler"
 echo "  View logs:     sudo journalctl -u koraveler -f"
 echo "  Restart:       sudo systemctl restart koraveler"
 echo "  Stop:          sudo systemctl stop koraveler"
-  
-  else
-  echo "========================================="
-  echo "❌ Application failed to start!"
-  echo "========================================="
-  echo ""
-  echo "System logs:"
-  sudo journalctl -u koraveler.service -n 50 --no-pager
-  echo ""
-  echo "Error logs:"
-  if [ -f ~/koraveler-back/koraveler/logs/koraveler-error.log ]; then
-  tail -n 50 ~/koraveler-back/koraveler/logs/koraveler-error.log
-  fi
-  exit 1
-  fi
-  ENDSSH
-  
-  # 키 파일 삭제
-  rm -f private_key.pem
+
+else
+echo "========================================="
+echo "❌ Application failed to start!"
+echo "========================================="
+echo ""
+echo "System logs:"
+sudo journalctl -u koraveler.service -n 50 --no-pager
+echo ""
+echo "Error logs:"
+if [ -f ~/koraveler-back/koraveler/logs/koraveler-error.log ]; then
+tail -n 50 ~/koraveler-back/koraveler/logs/koraveler-error.log
+fi
+exit 1
+fi
+ENDSSH
+
+# 키 파일 삭제
+rm -f private_key.pem
