@@ -91,8 +91,8 @@ jobs:
             echo "Setting up systemd service for auto-start..."
             echo "========================================="
           
-            # 서비스 파일 생성
-            sudo tee /etc/systemd/system/koraveler.service > /dev/null <<EOF
+            # 서비스 파일 생성 (cat과 pipe 사용)
+            cat <<'SERVICE' | sudo tee /etc/systemd/system/koraveler.service > /dev/null
   [Unit]
   Description=Koraveler Spring Boot Application
   After=network.target
@@ -118,7 +118,7 @@ jobs:
   
   [Install]
   WantedBy=multi-user.target
-  EOF
+  SERVICE
   
   # Systemd 리로드 및 서비스 활성화
   sudo systemctl daemon-reload
