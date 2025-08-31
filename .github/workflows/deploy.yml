@@ -7,7 +7,6 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -18,13 +17,16 @@ jobs:
           java-version: '21'
           distribution: 'temurin'
 
+      # koraveler 폴더로 이동해서 빌드
       - name: Grant execute permission for gradlew
         run: |
           cd koraveler
           chmod +x gradlew
 
       - name: Build with Gradle
-        run: ./gradlew build
+        run: |
+          cd koraveler
+          ./gradlew build
 
       - name: Deploy to EC2
         env:
@@ -40,8 +42,8 @@ jobs:
           mkdir -p ~/.ssh
           ssh-keyscan -H $HOST >> ~/.ssh/known_hosts
           
-          # 빌드된 JAR 파일 EC2로 복사
-          scp -i private_key.pem build/libs/koraveler-0.0.1-SNAPSHOT.jar $USER@$HOST:~/koraveler-back/koraveler/build/libs/
+          # 빌드된 JAR 파일 EC2로 복사 (koraveler 폴더에서)
+          scp -i private_key.pem koraveler/build/libs/koraveler-0.0.1-SNAPSHOT.jar $USER@$HOST:~/koraveler-back/koraveler/build/libs/
           
           # EC2에서 배포 실행
           ssh -i private_key.pem $USER@$HOST << 'ENDSSH'
@@ -50,13 +52,17 @@ jobs:
             # 로그 디렉토리 생성 (없는 경우)
             mkdir -p ~/koraveler-back/koraveler/logs
           
-            # Git pull (최신 코드 가져오기)
+            # Git pull (최신 코드 가져오기) - 루트 디렉토리에서
             echo "========================================="
             echo "Fetching latest code from git..."
             echo "========================================="
+            cd ~/koraveler-back
             git fetch --all
             git reset --hard origin/master
             git pull
+          
+            # 다시 koraveler 폴더로 이동
+            cd ~/koraveler-back/koraveler
           
             # 기존 프로세스 종료
             echo "========================================="
@@ -81,44 +87,94 @@ jobs:
               sleep 2
             fi
           
-            # ========================================
-            # 방법 1: 간단한 nohup 실행 (로그 파일 지정)
-            # ========================================
+            # start.sh 스크립트 생성 (없는 경우)
+            if [ ! -f ~/koraveler-back/koraveler/start.sh ]; then
+              echo "Creating start.sh script..."
+              cat > ~/koraveler-back/koraveler/start.sh << 'SCRIPT'
+                #!/bin/bash
+                APP_DIR="/home/ubuntu/koraveler-back/koraveler"
+                JAR_FILE="$APP_DIR/build/libs/koraveler-0.0.1-SNAPSHOT.jar"
+                LOG_DIR="$APP_DIR/logs"
+                PID_FILE="$APP_DIR/app.pid"
+
+                mkdir -p $LOG_DIR
+
+                # 기존 프로세스 종료
+                if [ -f $PID_FILE ]; then
+                  OLD_PID=$(cat $PID_FILE)
+                  if ps -p $OLD_PID > /dev/null 2>&1; then
+                    echo "Stopping old process (PID: $OLD_PID)..."
+                    kill -9 $OLD_PID
+                    sleep 2
+                  fi
+                fi
+
+                # 포트 확인 및 종료
+                PORT_PID=$(lsof -ti:3003)
+                if [ ! -z "$PORT_PID" ]; then
+                  echo "Killing process using port 3003: $PORT_PID"
+                  kill -9 $PORT_PID
+                  sleep 2
+                fi
+
+                # 애플리케이션 시작
+                echo "Starting Koraveler application..."
+                nohup java -Xmx512m -Xms256m -Dspring.profiles.active=prod -jar $JAR_FILE > $LOG_DIR/koraveler.log 2>&1 &
+          
+                # PID 저장
+                echo $! > $PID_FILE
+                echo "Application started with PID: $(cat $PID_FILE)"
+                echo "Logs: $LOG_DIR/koraveler.log"
+              SCRIPT
+
+              chmod +x ~/koraveler-back/koraveler/start.sh
+            fi
+          
+            # 스크립트 실행
             echo "========================================="
-            echo "Starting application with nohup..."
+            echo "Starting application with start.sh..."
             echo "========================================="
+            ./start.sh
           
-            nohup java -Xmx512m -Xms256m -jar ~/koraveler-back/koraveler/build/libs/koraveler-0.0.1-SNAPSHOT.jar \
-              > ~/koraveler-back/koraveler/logs/koraveler.log 2>&1 &
-          
-            # PID 저장
-            echo $! > ~/koraveler-back/koraveler/app.pid
-          
-            # 실행 확인
+            # 실행 확인 (시작까지 대기)
             sleep 8
           
-            if ps -p $(cat ~/koraveler-back/koraveler/app.pid) > /dev/null; then
-              echo "✅ Application started successfully with PID: $(cat ~/koraveler-back/koraveler/app.pid)"
-          
-              # 포트 확인
-              if lsof -Pi :3003 -sTCP:LISTEN -t > /dev/null 2>&1; then
-                echo "✅ Port 3003 is listening"
-                echo "Application URL: http://$HOST:3003"
+            # PID 파일과 프로세스 확인
+            if [ -f ~/koraveler-back/koraveler/app.pid ]; then
+              PID=$(cat ~/koraveler-back/koraveler/app.pid)
+              if ps -p $PID > /dev/null 2>&1; then
+                echo "========================================="
+                echo "✅ Application started successfully!"
+                echo "========================================="
+                echo "PID: $PID"
+
+                # 포트 확인
+                sleep 2
+                if lsof -Pi :3003 -sTCP:LISTEN -t > /dev/null 2>&1; then
+                  echo "✅ Port 3003 is listening"
+                  echo "Application URL: http://$HOST:3003"
+                else
+                  echo "⚠️ Warning: Port 3003 is not listening yet (may still be starting)"
+                fi
+
+                echo ""
+                echo "Recent application logs:"
+                tail -n 20 ~/koraveler-back/koraveler/logs/koraveler.log
+
+                echo ""
+                echo "========================================="
+                echo "✅ Deployment completed successfully!"
+                echo "========================================="
               else
-                echo "⚠️ Warning: Port 3003 is not listening yet"
+                echo "❌ Process died immediately after starting!"
+                tail -n 50 ~/koraveler-back/koraveler/logs/koraveler.log
+                exit 1
               fi
-          
-              echo ""
-              echo "Recent logs:"
-              tail -n 20 ~/koraveler-back/koraveler/logs/koraveler.log
-          
-              echo ""
-              echo "========================================="
-              echo "✅ Deployment completed successfully!"
-              echo "========================================="
             else
-              echo "❌ Application failed to start!"
-              tail -n 50 ~/koraveler-back/koraveler/logs/koraveler.log
+              echo "❌ PID file not created - application failed to start!"
+              if [ -f ~/koraveler-back/koraveler/logs/koraveler.log ]; then
+                tail -n 50 ~/koraveler-back/koraveler/logs/koraveler.log
+              fi
               exit 1
             fi
           ENDSSH
