@@ -42,6 +42,19 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
 
+        String path = request.getRequestURI();
+        String method = request.getMethod();
+
+        // ps 경로, OPTIONS 요청, 헬스체크는 JWT 검증 스킵
+        if ("OPTIONS".equalsIgnoreCase(method) ||
+                path.contains("ps") ||
+                path.equals("/") ||
+                path.equals("/health") ||
+                path.startsWith("/actuator")) {
+            chain.doFilter(request, response);
+            return;
+        }
+
         final String requestTokenHeader = request.getHeader("Authorization");
 
         String username = null;
@@ -66,9 +79,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     tokenDTO.setAccessToken(accessToken);
 
                     HttpEntity entity = new HttpEntity(tokenDTO, headers);
-                    // refresh까지 만료되면 로그인 화면으로 보내줄 로직
-//                    restTemplate.exchange(frontUrl + "/refresh", HttpMethod.POST, entity, String.class);
-
                     System.out.println("JWT Token has expired");
                 } catch (Exception e) {
                     System.out.println("Unable to get JWT Token");
@@ -84,7 +94,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
             // 토큰이 유효한 경우 수동으로 인증을 설정합니다.
             if (jwtTokenUtil.validateToken(accessToken)) {
-
                 UsernamePasswordAuthenticationToken usernamePasswordAuthenticationToken = new UsernamePasswordAuthenticationToken(
                         userDetails, null, userDetails.getAuthorities());
                 usernamePasswordAuthenticationToken
