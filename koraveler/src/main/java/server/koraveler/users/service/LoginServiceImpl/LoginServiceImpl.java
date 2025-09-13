@@ -23,6 +23,7 @@ import server.koraveler.utils.JwtUtil;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
@@ -42,42 +43,47 @@ public class LoginServiceImpl implements LoginService {
         return usersRepo.findByUserId(userId);
     }
 
-
     @Override
     public UsersDTO createUser(UsersDTO usersDTO) throws Exception {
         try {
             // validation 체크
-            // 1. 이미 있는 아이디인 경우
-            Users users = usersRepo.findByUserId(usersDTO.getUserId());
-            if (!ObjectUtils.isEmpty(users)) {
+            Users existingUser = usersRepo.findByUserId(usersDTO.getUserId());
+            if (!ObjectUtils.isEmpty(existingUser)) {
                 throw new Exception("이미 존재하는 ID입니다");
             }
 
-            // 2. 이미 있는 이메일인 경우
-            users = usersRepo.findByEmail(usersDTO.getEmail());
-            if (!ObjectUtils.isEmpty(users)) {
+            existingUser = usersRepo.findByEmail(usersDTO.getEmail());
+            if (!ObjectUtils.isEmpty(existingUser)) {
                 throw new Exception("이미 존재하는 이메일입니다");
             }
 
             LocalDateTime now = LocalDateTime.now();
-            users = new Users();
 
-            BeanUtils.copyProperties(usersDTO, users);
-            users.setUserPassword(passwordEncoder.encode(usersDTO.getUserPassword()));
-            users.setCreated(now);
-            users.setUpdated(now);
-            users.setEnabled(true);
-            users.setRoles(Collections.singletonList("user"));
+            // new Users()를 사용하면 UserCommon의 기본값이 자동 적용됨
+            Users newUser = new Users();
+            newUser.setUserId(usersDTO.getUserId());
+            newUser.setUserPassword(passwordEncoder.encode(usersDTO.getUserPassword()));
+            newUser.setEmail(usersDTO.getEmail());
+            newUser.setName(usersDTO.getName());
+            newUser.setBirthday(usersDTO.getBirthday());
+            newUser.setSrc(usersDTO.getSrc());
+            newUser.setRoles(Arrays.asList("user"));
+            newUser.setAuthorities(Arrays.asList("user"));
+            newUser.setCreated(now);
+            newUser.setUpdated(now);
+            // isEnabled 등은 이미 true로 초기화되어 있음
 
-            usersRepo.save(users);
+            Users savedUser = usersRepo.save(newUser);
 
-            UsersDTO newUsersDTO = new UsersDTO();
-            BeanUtils.copyProperties(users,newUsersDTO);
-            return newUsersDTO;
+            UsersDTO responseDTO = new UsersDTO();
+            BeanUtils.copyProperties(savedUser, responseDTO);
+            responseDTO.setUserPassword(null);
+
+            return responseDTO;
+
         } catch (Exception e) {
             throw e;
         }
-
     }
 
     // refresh token verify, access token 재생성
@@ -110,7 +116,7 @@ public class LoginServiceImpl implements LoginService {
     @Override
     public UsersDTO loginUser() throws Exception {
         try {
-           Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
             System.out.println("authentication = " + authentication);
             if (authentication != null && authentication.getPrincipal() != null) {
                 UserDetails userDetails = (UserDetails) authentication.getPrincipal();
@@ -121,6 +127,8 @@ public class LoginServiceImpl implements LoginService {
                 if (users != null) {
                     UsersDTO usersDTO = new UsersDTO();
                     BeanUtils.copyProperties(users, usersDTO);
+                    // 비밀번호는 응답에서 제외
+                    usersDTO.setUserPassword(null);
                     return usersDTO;
                 } else {
                     return null;
@@ -141,8 +149,4 @@ public class LoginServiceImpl implements LoginService {
             throw e;
         }
     }
-
-
-
-
 }

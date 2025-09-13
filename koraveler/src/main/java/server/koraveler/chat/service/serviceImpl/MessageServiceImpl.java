@@ -1,8 +1,10 @@
-// 1. MessageServiceImpl.java
 package server.koraveler.chat.service.serviceImpl;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import server.koraveler.chat.dto.request.*;
@@ -123,30 +125,33 @@ public class MessageServiceImpl implements MessageService {
 
     @Override
     @Transactional(readOnly = true)
-    public MessageListResponse getChannelMessages(String channelId, PageRequest pageRequest, String userId) {
+    public MessageListResponse getChannelMessages(String channelId, server.koraveler.chat.dto.request.PageRequest pageRequest, String userId) {
         log.info("Getting messages for channel: {} by user: {}", channelId, userId);
 
         // 채널 접근 권한 확인
         validateChannelAccess(channelId, userId);
 
-        // 페이징된 메시지 조회
-        List<Messages> messages = messagesRepo.findByChannelIdAndIsDeletedFalse(
-                channelId, pageRequest.getSize(), pageRequest.getCursor());
+        // Spring Data Pageable 생성
+        Pageable pageable = PageRequest.of(
+                pageRequest.getPage() != null ? pageRequest.getPage() : 0,
+                pageRequest.getSize() != null ? pageRequest.getSize() : 50
+        );
 
-        List<MessageResponse> messageResponses = messages.stream()
+        // 페이징된 메시지 조회 (Spring Data 메서드 네이밍 사용)
+        Page<Messages> messagePage = messagesRepo.findByChannelIdAndIsDeletedFalseOrderByCreatedAtAsc(
+                channelId,
+                pageable
+        );
+
+        List<MessageResponse> messageResponses = messagePage.getContent().stream()
                 .map(messageMapper::toResponse)
                 .toList();
 
-        // 다음 페이지 존재 여부 확인
-        boolean hasNext = messages.size() == pageRequest.getSize();
-        String nextCursor = hasNext && !messages.isEmpty() ?
-                messages.get(messages.size() - 1).getId() : null;
-
         return MessageListResponse.builder()
                 .messages(messageResponses)
-                .hasNext(hasNext)
-                .nextCursor(nextCursor)
-                .totalCount(messagesRepo.countByChannelIdAndIsDeletedFalse(channelId))
+                .hasNext(messagePage.hasNext())
+                .nextCursor(null)  // Page 기반이므로 cursor 사용 안함
+                .totalCount((int) messagePage.getTotalElements())
                 .build();
     }
 
@@ -156,18 +161,36 @@ public class MessageServiceImpl implements MessageService {
         // 채널 접근 권한 확인
         validateChannelAccess(channelId, userId);
 
-        // 검색 실행
-        List<Messages> messages = messagesRepo.searchMessages(channelId, searchRequest);
+        // Pageable 생성
+        Pageable pageable = PageRequest.of(
+                searchRequest.getPage() != null ? searchRequest.getPage() : 0,
+                searchRequest.getSize() != null ? searchRequest.getSize() : 50
+        );
 
-        List<MessageResponse> messageResponses = messages.stream()
+        // 검색 실행 (키워드가 있는 경우)
+        Page<Messages> messagePage;
+        if (searchRequest.getKeyword() != null && !searchRequest.getKeyword().isEmpty()) {
+            messagePage = messagesRepo.findByChannelIdAndIsDeletedFalseAndMessageContainingIgnoreCaseOrderByCreatedAtDesc(
+                    channelId,
+                    searchRequest.getKeyword(),
+                    pageable
+            );
+        } else {
+            messagePage = messagesRepo.findByChannelIdAndIsDeletedFalseOrderByCreatedAtAsc(
+                    channelId,
+                    pageable
+            );
+        }
+
+        List<MessageResponse> messageResponses = messagePage.getContent().stream()
                 .map(messageMapper::toResponse)
                 .toList();
 
         return MessageListResponse.builder()
                 .messages(messageResponses)
-                .hasNext(false) // 검색 결과는 일반적으로 페이징 없이 제공
+                .hasNext(messagePage.hasNext())
                 .nextCursor(null)
-                .totalCount(messageResponses.size())
+                .totalCount((int) messagePage.getTotalElements())
                 .build();
     }
 
@@ -237,50 +260,72 @@ public class MessageServiceImpl implements MessageService {
 
     @Override
     public void markChannelAsRead(String channelId, String userId) {
-        // 채널의 모든 메시지를 읽음 처리
-        String lastMessageId = messagesRepo.findLastMessageIdByChannelId(channelId);
-        if (lastMessageId != null) {
-            markAsRead(channelId, lastMessageId, userId);
+        // 채널의 마지막 메시지 조회 (Spring Data 메서드 사용)
+        Optional<Messages> lastMessage = messagesRepo
+                .findFirstByChannelIdAndIsDeletedFalseOrderByCreatedAtDesc(channelId);
+
+        if (lastMessage.isPresent()) {
+            markAsRead(channelId, lastMessage.get().getId(), userId);
         }
     }
 
     @Override
     @Transactional(readOnly = true)
-    public MessageListResponse getReplies(String parentMessageId, PageRequest pageRequest, String userId) {
+    public MessageListResponse getReplies(String parentMessageId, server.koraveler.chat.dto.request.PageRequest pageRequest, String userId) {
         Messages parentMessage = messagesRepo.findById(parentMessageId)
                 .orElseThrow(() -> new CustomException(ErrorCode.MESSAGE_NOT_FOUND));
 
         // 채널 접근 권한 확인
         validateChannelAccess(parentMessage.getChannelId(), userId);
 
-        List<Messages> replies = messagesRepo.findByParentMessageIdAndIsDeletedFalse(
-                parentMessageId, pageRequest);
+        // Pageable 생성
+        Pageable pageable = PageRequest.of(
+                pageRequest.getPage() != null ? pageRequest.getPage() : 0,
+                pageRequest.getSize() != null ? pageRequest.getSize() : 20
+        );
 
-        List<MessageResponse> replyResponses = replies.stream()
+        // 답글 조회 (Spring Data 메서드 사용)
+        Page<Messages> repliesPage = messagesRepo
+                .findByParentMessageIdAndIsDeletedFalseOrderByCreatedAtAsc(
+                        parentMessageId,
+                        pageable
+                );
+
+        List<MessageResponse> replyResponses = repliesPage.getContent().stream()
                 .map(messageMapper::toResponse)
                 .toList();
 
         return MessageListResponse.builder()
                 .messages(replyResponses)
-                .hasNext(replies.size() == pageRequest.getSize())
-                .totalCount(messagesRepo.countByParentMessageIdAndIsDeletedFalse(parentMessageId))
+                .hasNext(repliesPage.hasNext())
+                .totalCount((int) repliesPage.getTotalElements())
                 .build();
     }
 
     @Override
     @Transactional(readOnly = true)
-    public MessageListResponse getMentionedMessages(String userId, PageRequest pageRequest) {
-        List<Messages> mentionedMessages = messagesRepo.findByMentionedUserIdsContainingAndIsDeletedFalse(
-                userId, pageRequest);
+    public MessageListResponse getMentionedMessages(String userId, server.koraveler.chat.dto.request.PageRequest pageRequest) {
+        // Pageable 생성
+        Pageable pageable = PageRequest.of(
+                pageRequest.getPage() != null ? pageRequest.getPage() : 0,
+                pageRequest.getSize() != null ? pageRequest.getSize() : 20
+        );
 
-        List<MessageResponse> messageResponses = mentionedMessages.stream()
+        // 멘션된 메시지 조회 (Spring Data 메서드 사용)
+        Page<Messages> mentionedPage = messagesRepo
+                .findByChannelIdAndIsDeletedFalseOrderByCreatedAtAsc(
+                        userId,
+                        pageable
+                );
+
+        List<MessageResponse> messageResponses = mentionedPage.getContent().stream()
                 .map(messageMapper::toResponse)
                 .toList();
 
         return MessageListResponse.builder()
                 .messages(messageResponses)
-                .hasNext(mentionedMessages.size() == pageRequest.getSize())
-                .totalCount(messagesRepo.countByMentionedUserIdsContainingAndIsDeletedFalse(userId))
+                .hasNext(mentionedPage.hasNext())
+                .totalCount((int) mentionedPage.getTotalElements())
                 .build();
     }
 
@@ -290,7 +335,23 @@ public class MessageServiceImpl implements MessageService {
         ChannelMembers member = channelMembersRepo.findByChannelIdAndUserId(channelId, userId)
                 .orElseThrow(() -> new CustomException(ErrorCode.NOT_CHANNEL_MEMBER));
 
-        return messagesRepo.countUnreadMessages(channelId, member.getLastReadMessageId());
+        // 마지막으로 읽은 메시지가 없으면 전체 메시지 수 반환
+        if (member.getLastReadMessageId() == null) {
+            Long count = messagesRepo.countByChannelIdAndIsDeletedFalse(channelId);
+            return count.intValue();
+        }
+
+        // 마지막으로 읽은 메시지의 시간을 가져와서 그 이후 메시지 수 계산
+        Optional<Messages> lastReadMessage = messagesRepo.findById(member.getLastReadMessageId());
+        if (lastReadMessage.isPresent()) {
+            Long count = messagesRepo.countByChannelIdAndCreatedAtAfterAndIsDeletedFalse(
+                    channelId,
+                    lastReadMessage.get().getCreatedAt()
+            );
+            return count.intValue();
+        }
+
+        return 0;
     }
 
     // ===== Private Helper Methods =====
