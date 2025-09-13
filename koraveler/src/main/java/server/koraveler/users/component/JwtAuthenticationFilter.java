@@ -3,35 +3,30 @@ package server.koraveler.users.component;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.ExpiredJwtException;
+import io.jsonwebtoken.JwtException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.annotation.Lazy;
-import org.springframework.http.*;
-import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
-import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.client.RestTemplate;
 import org.springframework.web.filter.OncePerRequestFilter;
-import server.koraveler.users.dto.TokenDTO;
 import server.koraveler.users.service.CustomUserDetailsServiceImpl.CustomUserDetailService;
-import server.koraveler.users.service.LoginService;
 import server.koraveler.utils.JwtUtil;
 
 import java.io.IOException;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+@Slf4j
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
+
     @Autowired
     private JwtUtil jwtTokenUtil;
 
@@ -39,68 +34,97 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private CustomUserDetailService customUserDetailService;
 
     @Override
-    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
-            throws ServletException, IOException {
+    protected void doFilterInternal(HttpServletRequest request,
+                                    HttpServletResponse response,
+                                    FilterChain chain) throws ServletException, IOException {
 
         String path = request.getRequestURI();
         String method = request.getMethod();
 
-        // ps 경로, OPTIONS 요청, 헬스체크는 JWT 검증 스킵
-        if ("OPTIONS".equalsIgnoreCase(method) ||
-                path.contains("ps") ||
-                path.equals("/") ||
-                path.equals("/health") ||
-                path.startsWith("/actuator")) {
+        // 인증이 필요 없는 경로들
+        if (shouldSkipAuthentication(path, method)) {
             chain.doFilter(request, response);
             return;
         }
 
         final String requestTokenHeader = request.getHeader("Authorization");
 
-        String username = null;
-        String accessToken = null;
+        // Bearer 토큰이 없는 경우
+        if (requestTokenHeader == null || !requestTokenHeader.startsWith("Bearer ")) {
+            log.warn("JWT Token does not begin with Bearer String");
+            chain.doFilter(request, response);
+            return;
+        }
 
-        // JWT 토큰은 "Bearer "로 시작하므로 이를 검증합니다.
-        if (requestTokenHeader != null && requestTokenHeader.startsWith("Bearer ")) {
-            accessToken = requestTokenHeader.substring(7);
-            if (accessToken != null) {
-                try {
-                    Claims decodedJWT = JwtUtil.verifyToken(accessToken);
-                    username = decodedJWT.getSubject();
-                } catch (IllegalArgumentException e) {
-                    System.out.println("Unable to get JWT Token");
-                } catch (RuntimeException e) {
-                    // 프론트에 Refresh 토큰을 요청한다
-                    RestTemplate restTemplate = new RestTemplate();
-                    HttpHeaders headers = new HttpHeaders();
-                    headers.add("Content-Type", "application/json");
-                    headers.add("Authorization", "Bearer " + accessToken);
-                    TokenDTO tokenDTO = new TokenDTO();
-                    tokenDTO.setAccessToken(accessToken);
+        String accessToken = requestTokenHeader.substring(7);
 
-                    HttpEntity entity = new HttpEntity(tokenDTO, headers);
-                    System.out.println("JWT Token has expired");
-                } catch (Exception e) {
-                    System.out.println("Unable to get JWT Token");
+        try {
+            // ✅ 인스턴스 메서드로 호출
+            Claims claims = jwtTokenUtil.verifyToken(accessToken);
+            String username = claims.getSubject();
+
+            // SecurityContext에 인증 정보가 없는 경우에만 설정
+            if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+
+                UserDetails userDetails = customUserDetailService.loadUserByUsername(username);
+
+                // 토큰 유효성 추가 검증
+                if (jwtTokenUtil.validateToken(accessToken, userDetails)) {
+                    UsernamePasswordAuthenticationToken authentication =
+                            new UsernamePasswordAuthenticationToken(
+                                    userDetails, null, userDetails.getAuthorities());
+                    authentication.setDetails(
+                            new WebAuthenticationDetailsSource().buildDetails(request));
+                    SecurityContextHolder.getContext().setAuthentication(authentication);
+
+                    log.debug("Authentication set for user: {}", username);
                 }
             }
-        } else {
-            logger.warn("JWT Token does not begin with Bearer String");
-        }
 
-        // 토큰을 얻으면 검증을 시작합니다.
-        if (username != null) {
-            UserDetails userDetails = customUserDetailService.loadUserByUsername(username);
+            // 인증 성공 시 다음 필터로 진행
+            chain.doFilter(request, response);
 
-            // 토큰이 유효한 경우 수동으로 인증을 설정합니다.
-            if (jwtTokenUtil.validateToken(accessToken)) {
-                UsernamePasswordAuthenticationToken usernamePasswordAuthenticationToken = new UsernamePasswordAuthenticationToken(
-                        userDetails, null, userDetails.getAuthorities());
-                usernamePasswordAuthenticationToken
-                        .setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                SecurityContextHolder.getContext().setAuthentication(usernamePasswordAuthenticationToken);
-            }
+        } catch (ExpiredJwtException e) {
+            log.error("JWT Token has expired", e);
+            sendUnauthorizedError(response, "Token expired");
+            // ✅ 중요: return으로 필터 체인 중단
+            return;
+
+        } catch (JwtException e) {
+            log.error("Invalid JWT Token", e);
+            sendUnauthorizedError(response, "Invalid token");
+            return;
+
+        } catch (Exception e) {
+            log.error("Unable to process JWT Token", e);
+            sendUnauthorizedError(response, "Authentication failed");
+            return;
         }
-        chain.doFilter(request, response);
+    }
+
+    private boolean shouldSkipAuthentication(String path, String method) {
+        return "OPTIONS".equalsIgnoreCase(method) ||
+                path.contains("ps") ||
+                path.equals("/") ||
+                path.equals("/health") ||
+                path.startsWith("/actuator") ||
+                path.startsWith("/api/auth/login") ||
+                path.startsWith("/api/auth/register") ||
+                path.startsWith("/api/auth/refresh");
+    }
+
+    private void sendUnauthorizedError(HttpServletResponse response, String message)
+            throws IOException {
+        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+        response.setContentType("application/json;charset=UTF-8");
+
+        Map<String, Object> errorDetails = new LinkedHashMap<>();
+        errorDetails.put("error", "Unauthorized");
+        errorDetails.put("message", message);
+        errorDetails.put("status", 401);
+        errorDetails.put("timestamp", System.currentTimeMillis());
+
+        ObjectMapper mapper = new ObjectMapper();
+        mapper.writeValue(response.getWriter(), errorDetails);
     }
 }

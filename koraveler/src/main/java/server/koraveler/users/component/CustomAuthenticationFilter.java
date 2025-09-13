@@ -6,25 +6,18 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.authentication.dao.AbstractUserDetailsAuthenticationProvider;
-import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.stereotype.Component;
-import org.springframework.stereotype.Service;
 import server.koraveler.users.dto.TokenDTO;
-import server.koraveler.users.dto.UsersDTO;
-import server.koraveler.users.service.CustomUserDetailsServiceImpl.CustomUserDetailService;
 import server.koraveler.utils.JwtUtil;
 
 import java.io.IOException;
@@ -49,53 +42,76 @@ public class CustomAuthenticationFilter extends UsernamePasswordAuthenticationFi
 
     public CustomAuthenticationFilter(AuthenticationManager authenticationManager) {
         this.authenticationManager = authenticationManager;
-        setFilterProcessesUrl("/ps/login"); // Set custom login URL if needed
+        setFilterProcessesUrl("/ps/login");
     }
 
     @Override
     public Authentication attemptAuthentication(HttpServletRequest request, HttpServletResponse response)
             throws AuthenticationException {
-        System.out.println("request = " + request);
+        System.out.println("Attempting authentication for request: " + request.getRequestURI());
+
         String username = request.getParameter("username");
         String password = request.getParameter("password");
 
-        UsernamePasswordAuthenticationToken authenticationToken = new UsernamePasswordAuthenticationToken(username, password);
+        System.out.println("Username: " + username); // 디버깅용
+
+        UsernamePasswordAuthenticationToken authenticationToken =
+                new UsernamePasswordAuthenticationToken(username, password);
+
+        // 인증 수행
         Authentication authentication = authenticationManager.authenticate(authenticationToken);
-        SecurityContextHolder.getContext().setAuthentication(authenticationToken);
+
+        // ✅ 핵심 수정: authentication 객체를 저장 (authenticationToken이 아님!)
+        SecurityContextHolder.getContext().setAuthentication(authentication);
+
+        System.out.println("Authentication successful for user: " + username);
 
         return authentication;
     }
 
-    // 로그인 성공
     @Override
-    public void successfulAuthentication(HttpServletRequest request, HttpServletResponse response, FilterChain chain, Authentication authResult) throws IOException {
-        UserDetails usersDTO = (UserDetails) authResult.getPrincipal();
+    protected void successfulAuthentication(HttpServletRequest request,
+                                            HttpServletResponse response,
+                                            FilterChain chain,
+                                            Authentication authResult) throws IOException {
+        System.out.println("Processing successful authentication");
 
-        String accessToken = jwtUtil.generateAccessToken(usersDTO.getUsername());
-        String refreshToken = jwtUtil.generateRefreshToken(usersDTO.getUsername());
+        UserDetails userDetails = (UserDetails) authResult.getPrincipal();
+
+        String accessToken = jwtUtil.generateAccessToken(userDetails.getUsername());
+        String refreshToken = jwtUtil.generateRefreshToken(userDetails.getUsername());
 
         TokenDTO tokenDTO = new TokenDTO();
         tokenDTO.setAccessToken(accessToken);
         tokenDTO.setRefreshToken(refreshToken);
-        tokenDTO.setGrantType(usersDTO.getAuthorities());
+        tokenDTO.setGrantType(userDetails.getAuthorities());
 
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         response.setStatus(HttpStatus.OK.value());
         response.setHeader("accessToken", accessToken);
         response.setHeader("refreshToken", refreshToken);
-        response.setHeader("authorities", usersDTO.getAuthorities().toString());
+        response.setHeader("authorities", userDetails.getAuthorities().toString());
+
         new ObjectMapper().writeValue(response.getOutputStream(), tokenDTO);
+
+        System.out.println("Token generated successfully for user: " + userDetails.getUsername());
     }
 
-    // 로그인 실패
     @Override
-    public void unsuccessfulAuthentication(HttpServletRequest request, HttpServletResponse response, AuthenticationException failed) throws IOException, ServletException {
+    protected void unsuccessfulAuthentication(HttpServletRequest request,
+                                              HttpServletResponse response,
+                                              AuthenticationException failed)
+            throws IOException, ServletException {
+        System.err.println("Authentication failed: " + failed.getMessage());
+        failed.printStackTrace(); // 디버깅용
+
         response.setStatus(HttpStatus.UNAUTHORIZED.value());
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
 
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("code", HttpStatus.UNAUTHORIZED.value());
         body.put("error", failed.getMessage());
+        body.put("message", "Invalid username or password");
 
         new ObjectMapper().writeValue(response.getOutputStream(), body);
     }

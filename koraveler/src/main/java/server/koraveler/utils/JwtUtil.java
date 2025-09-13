@@ -1,68 +1,62 @@
 package server.koraveler.utils;
 
 import io.jsonwebtoken.*;
-import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
-import org.springframework.stereotype.Service;
 
 import java.security.Key;
 import java.util.Date;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.function.Function;
 
 @Component
 public class JwtUtil {
     private static final byte[] SECRET_KEY = "harieshariesharieshaireshariesha".getBytes();
-    private static final long ACCESS_TOKEN_EXPIRY = 1 * 60 * 1000; // 60 minutes
-    private static final long REFRESH_TOKEN_EXPIRY = 30 * 24 * 10 * 60 * 1000; // 30 days
+    private static final long ACCESS_TOKEN_EXPIRY = 60 * 60 * 1000; // 1 minute (테스트용)
+    private static final long REFRESH_TOKEN_EXPIRY = 30 * 24 * 60 * 60 * 1000; // 30 days
     private static final SignatureAlgorithm algorithm = SignatureAlgorithm.HS256;
 
-    public static String generateAccessToken(String username) {
-
+    // static 제거하고 인스턴스 메서드로 변경
+    public String generateAccessToken(String username) {
         String token = Jwts.builder()
                 .setSubject(username)
                 .setIssuedAt(new Date())
                 .setExpiration(new Date(System.currentTimeMillis() + ACCESS_TOKEN_EXPIRY))
                 .signWith(algorithm, SECRET_KEY)
                 .compact();
-        Jws<Claims> claimsJws = Jwts.parserBuilder()
-                .setSigningKey(SECRET_KEY)
-                .build()
-                .parseClaimsJws(token);
-        System.out.println("body access" + claimsJws.getBody());
         return token;
     }
 
-    public static String generateRefreshToken(String username) {
+    public String generateRefreshToken(String username) {
         String token = Jwts.builder()
                 .setSubject(username)
                 .setIssuedAt(new Date())
                 .setExpiration(new Date(System.currentTimeMillis() + REFRESH_TOKEN_EXPIRY))
                 .signWith(algorithm, SECRET_KEY)
                 .compact();
-        Jws<Claims> claimsJws = Jwts.parserBuilder()
-                .setSigningKey(SECRET_KEY)
-                .build()
-                .parseClaimsJws(token);
-        System.out.println("body access" + claimsJws.getBody());
         return token;
     }
 
-    public static Claims verifyToken(String token) throws RuntimeException, Exception {
+    // ✅ 수정: ExpiredJwtException을 그대로 던지도록 변경
+    public Claims verifyToken(String token) throws ExpiredJwtException, JwtException {
         try {
             Jws<Claims> claimsJws = Jwts.parserBuilder()
-                    .setSigningKey(SECRET_KEY).build()
+                    .setSigningKey(SECRET_KEY)
+                    .build()
                     .parseClaimsJws(token);
             return claimsJws.getBody();
         } catch (ExpiredJwtException e) {
-            throw new RuntimeException("Token expired", e);
+            // ExpiredJwtException을 그대로 던짐
+            throw e;
         } catch (Exception e) {
-            throw new RuntimeException("Invalid token", e);
+            // 다른 JWT 관련 예외를 JwtException으로 변환
+            throw new JwtException("Invalid token", e);
         }
+    }
 
+    // ✅ 추가: 토큰에서 사용자명 추출 (예외 처리 포함)
+    public String extractUsername(String token) throws ExpiredJwtException, JwtException {
+        return verifyToken(token).getSubject();
     }
 
     // 토큰에서 만료 날짜를 가져오는 메서드
@@ -87,12 +81,32 @@ public class JwtUtil {
 
     // 토큰이 만료되었는지 확인하는 메서드
     private Boolean isTokenExpired(String token) {
-        final Date expiration = getExpirationDateFromToken(token);
-        return expiration.before(new Date());
+        try {
+            final Date expiration = getExpirationDateFromToken(token);
+            return expiration.before(new Date());
+        } catch (ExpiredJwtException e) {
+            return true;
+        }
     }
 
     // 토큰을 검증하는 메서드
     public Boolean validateToken(String token) {
-        return !isTokenExpired(token);
+        try {
+            verifyToken(token);
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    // ✅ 추가: UserDetails와 함께 토큰 검증
+    public Boolean validateToken(String token, UserDetails userDetails) {
+        try {
+            Claims claims = verifyToken(token);
+            String username = claims.getSubject();
+            return username.equals(userDetails.getUsername()) && !isTokenExpired(token);
+        } catch (Exception e) {
+            return false;
+        }
     }
 }

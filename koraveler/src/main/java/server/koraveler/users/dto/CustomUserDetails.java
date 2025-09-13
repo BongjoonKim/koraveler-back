@@ -1,11 +1,9 @@
 package server.koraveler.users.dto;
 
 import org.springframework.security.core.GrantedAuthority;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 import server.koraveler.users.model.Users;
 
-import java.util.ArrayList;
 import java.util.Collection;
 
 public class CustomUserDetails implements UserDetails {
@@ -13,6 +11,11 @@ public class CustomUserDetails implements UserDetails {
 
     public CustomUserDetails(Users users) {
         this.users = users;
+    }
+
+    // ✅ Users 엔티티를 가져오는 getter 추가
+    public Users getUsers() {
+        return users;
     }
 
     @Override
@@ -49,5 +52,4 @@ public class CustomUserDetails implements UserDetails {
     public boolean isCredentialsNonExpired() {
         return users.isCredentialsNonExpired();
     }
-
 }

@@ -1,4 +1,3 @@
-// ChannelsRepo.java
 package server.koraveler.chat.repository;
 
 import org.springframework.data.domain.Pageable;
@@ -15,6 +14,23 @@ import java.util.List;
 @Repository
 public interface ChannelsRepo extends MongoRepository<Channels, String> {
 
+    // ===== 간단한 테스트용 메서드들 =====
+
+    // 1. 가장 기본적인 Spring Data 메서드 (이것부터 테스트)
+    List<Channels> findByIdIn(List<String> ids);
+
+    // 2. 페이징 포함
+    List<Channels> findByIdIn(List<String> ids, Pageable pageable);
+
+    // 3. isArchived 조건 추가 (null 처리 포함)
+    List<Channels> findByIdInAndIsArchivedNot(List<String> ids, Boolean archived, Pageable pageable);
+
+    // 4. 생성자로 조회
+    List<Channels> findByCreatedUserId(String userId);
+
+    // 5. 생성자 + isArchived 조건
+    List<Channels> findByCreatedUserIdAndIsArchivedNot(String userId, Boolean archived);
+
     // 채널명 중복 체크
     boolean existsByNameAndChannelType(String name, ChannelType channelType);
 
@@ -26,19 +42,19 @@ public interface ChannelsRepo extends MongoRepository<Channels, String> {
     @Query(value = "{'channelType': 'PUBLIC', 'isArchived': false}", count = true)
     Long countPublicChannels();
 
-    // 사용자 참여 채널 목록 (Aggregation Pipeline 사용)
-    @Query(value = "{ $expr: { $and: [" +
-            "{ $eq: ['$isArchived', false] }," +
-            "{ $in: ['$_id', ?1] }" +
-            "] } }")
-    List<Channels> findUserChannelsByIds(String userId, List<String> channelIds, Pageable pageable);
+    // ✅ 수정된 쿼리 - userId 파라미터 제거하고 올바른 MongoDB 문법 사용
+    @Query("{ $and: [" +
+            "{ 'isArchived': false }," +
+            "{ '_id': { $in: ?0 } }" +  // ?0은 첫 번째 파라미터인 channelIds
+            "] }")
+    List<Channels> findUserChannelsByIds(List<String> channelIds, Pageable pageable);
 
-    // 사용자 참여 채널 수
-    @Query(value = "{ $expr: { $and: [" +
-            "{ $eq: ['$isArchived', false] }," +
-            "{ $in: ['$_id', ?1] }" +
-            "] } }", count = true)
-    Long countUserChannelsByIds(String userId, List<String> channelIds);
+    // ✅ 수정된 카운트 쿼리
+    @Query(value = "{ $and: [" +
+            "{ 'isArchived': false }," +
+            "{ '_id': { $in: ?0 } }" +
+            "] }", count = true)
+    Long countUserChannelsByIds(List<String> channelIds);
 
     // 채널 검색 - 공개 채널 대상
     @Query("{ $and: [" +
@@ -53,10 +69,10 @@ public interface ChannelsRepo extends MongoRepository<Channels, String> {
             "] }")
     List<Channels> searchPublicChannels(String keyword, Pageable pageable);
 
-    // 채널 검색 - 사용자 채널 대상
+    // ✅ 수정된 사용자 채널 검색
     @Query("{ $and: [" +
             "{ 'isArchived': false }," +
-            "{ '_id': { $in: ?1 } }," +
+            "{ '_id': { $in: ?1 } }," +  // ?1은 두 번째 파라미터인 channelIds
             "{ $or: [" +
             "{ 'name': { $regex: ?0, $options: 'i' } }," +
             "{ 'description': { $regex: ?0, $options: 'i' } }," +
@@ -79,7 +95,7 @@ public interface ChannelsRepo extends MongoRepository<Channels, String> {
             "] }", count = true)
     Long countSearchPublicChannels(String keyword);
 
-    // 사용자 채널 검색 결과 수
+    // ✅ 수정된 사용자 채널 검색 카운트
     @Query(value = "{ $and: [" +
             "{ 'isArchived': false }," +
             "{ '_id': { $in: ?1 } }," +
@@ -114,4 +130,7 @@ public interface ChannelsRepo extends MongoRepository<Channels, String> {
 
     // 활성 멤버 수가 많은 채널 조회
     List<Channels> findByIsArchivedFalseOrderByMemberCountDesc(Pageable pageable);
+
+    // ✅ 대안: Spring Data 메서드 네이밍 컨벤션 사용 (쿼리 없이)
+    List<Channels> findByIdInAndIsArchivedFalse(List<String> ids, Pageable pageable);
 }

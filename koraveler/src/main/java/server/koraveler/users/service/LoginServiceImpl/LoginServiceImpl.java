@@ -28,6 +28,10 @@ import java.util.List;
 
 @Service
 public class LoginServiceImpl implements LoginService {
+    // ✅ JwtUtil을 의존성 주입으로 받기
+    @Autowired
+    private JwtUtil jwtUtil;
+
     @Autowired
     private UsersRepo usersRepo;
 
@@ -81,11 +85,10 @@ public class LoginServiceImpl implements LoginService {
     public TokenDTO refreshToken(String refreshToken) throws CustomException, Exception {
         try {
             TokenDTO newTokenDTO = new TokenDTO();
-            Claims claims = JwtUtil.verifyToken(refreshToken);
-            System.out.println("claims = " + claims.getSubject().isEmpty());
+            Claims claims = jwtUtil.verifyToken(refreshToken);
             if(!claims.getSubject().isEmpty()) {
                 String userId = claims.getSubject();
-                String newAccessToken  = JwtUtil.generateAccessToken(userId);
+                String newAccessToken  = jwtUtil.generateAccessToken(userId);
                 newTokenDTO.setRefreshToken(refreshToken);
                 newTokenDTO.setAccessToken(newAccessToken);
             }
