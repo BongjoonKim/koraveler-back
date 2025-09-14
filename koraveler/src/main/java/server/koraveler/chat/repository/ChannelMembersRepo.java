@@ -8,6 +8,7 @@ import org.springframework.stereotype.Repository;
 import server.koraveler.chat.model.entities.ChannelMembers;
 import server.koraveler.chat.model.enums.MemberStatus;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -29,9 +30,12 @@ public interface ChannelMembersRepo extends MongoRepository<ChannelMembers, Stri
     @Query(value = "{'channelId': ?0, 'status': 'ACTIVE'}", count = true)
     Long countActiveMembers(String channelId);
 
-    // 온라인 멤버 조회 (최근 시간 내 활동한 사용자)
-    @Query("{'channelId': ?0, 'status': 'ACTIVE', 'lastSeenAt': {$gte: ?1}}")
-    List<ChannelMembers> findOnlineMembers(String channelId);
+    // ChannelMembersRepo.java
+    List<ChannelMembers> findByChannelIdAndStatusAndLastSeenAtAfter(
+            String channelId,
+            MemberStatus status,
+            LocalDateTime sinceTime
+    );
 
     // 특정 사용자의 모든 채널 멤버십 조회
     List<ChannelMembers> findByUserId(String userId);

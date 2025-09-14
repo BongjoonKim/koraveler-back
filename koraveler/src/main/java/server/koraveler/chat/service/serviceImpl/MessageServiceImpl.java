@@ -128,29 +128,31 @@ public class MessageServiceImpl implements MessageService {
     public MessageListResponse getChannelMessages(String channelId, server.koraveler.chat.dto.request.PageRequest pageRequest, String userId) {
         log.info("Getting messages for channel: {} by user: {}", channelId, userId);
 
-        // 채널 접근 권한 확인
         validateChannelAccess(channelId, userId);
 
-        // Spring Data Pageable 생성
         Pageable pageable = PageRequest.of(
                 pageRequest.getPage() != null ? pageRequest.getPage() : 0,
                 pageRequest.getSize() != null ? pageRequest.getSize() : 50
         );
 
-        // 페이징된 메시지 조회 (Spring Data 메서드 네이밍 사용)
         Page<Messages> messagePage = messagesRepo.findByChannelIdAndIsDeletedFalseOrderByCreatedAtAsc(
                 channelId,
                 pageable
         );
 
+        // ✅ 수정: isMyMessage 설정 추가
         List<MessageResponse> messageResponses = messagePage.getContent().stream()
-                .map(messageMapper::toResponse)
+                .map(message -> {
+                    MessageResponse response = messageMapper.toResponse(message);
+                    response.setIsMyMessage(message.getUserId().equals(userId)); // 현재 사용자와 비교
+                    return response;
+                })
                 .toList();
 
         return MessageListResponse.builder()
                 .messages(messageResponses)
                 .hasNext(messagePage.hasNext())
-                .nextCursor(null)  // Page 기반이므로 cursor 사용 안함
+                .nextCursor(null)
                 .totalCount((int) messagePage.getTotalElements())
                 .build();
     }

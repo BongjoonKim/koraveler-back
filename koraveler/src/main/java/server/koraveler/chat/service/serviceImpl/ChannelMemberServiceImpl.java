@@ -238,10 +238,16 @@ public class ChannelMemberServiceImpl implements ChannelMemberService {
     @Override
     @Transactional(readOnly = true)
     public List<ChannelMemberResponse> getOnlineMembers(String channelId, String userId) {
-        // 채널 접근 권한 확인
         validateChannelMembership(channelId, userId);
 
-        List<ChannelMembers> onlineMembers = channelMembersRepo.findOnlineMembers(channelId);
+        LocalDateTime onlineThreshold = LocalDateTime.now().minusMinutes(5);
+
+        List<ChannelMembers> onlineMembers = channelMembersRepo
+                .findByChannelIdAndStatusAndLastSeenAtAfter(
+                        channelId,
+                        MemberStatus.ACTIVE,
+                        onlineThreshold
+                );
 
         return onlineMembers.stream()
                 .map(this::toChannelMemberResponse)
