@@ -61,7 +61,11 @@ public class SecurityConfig {
             .cors(cors -> {
                 cors.configurationSource(corsConfig.corsConfigurationSource());
             })
-            .csrf(csrf -> csrf.disable())
+                .csrf(csrf -> csrf
+                        .ignoringRequestMatchers("/ws/**")  // WebSocket CSRF 제외
+                        .ignoringRequestMatchers("/api/**")  // API CSRF 제외
+                        .disable()
+                )
             .formLogin(AbstractHttpConfigurer::disable)
             .authorizeHttpRequests(req -> req
                     .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()

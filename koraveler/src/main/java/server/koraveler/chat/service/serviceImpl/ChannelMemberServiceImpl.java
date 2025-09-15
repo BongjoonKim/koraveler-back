@@ -5,18 +5,26 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import server.koraveler.chat.dto.mapper.ChannelMapper;
+import server.koraveler.chat.dto.request.ChannelJoinRequest;
 import server.koraveler.chat.dto.response.ChannelMemberResponse;
+import server.koraveler.chat.dto.response.ChannelResponse;
+import server.koraveler.chat.model.entities.ChannelAuthorities;
 import server.koraveler.chat.model.entities.ChannelMembers;
+import server.koraveler.chat.model.entities.Channels;
+import server.koraveler.chat.model.enums.ChannelType;
 import server.koraveler.chat.model.enums.MemberStatus;
 import server.koraveler.chat.model.enums.NotificationLevel;
 import server.koraveler.chat.repository.ChannelMembersRepo;
 import server.koraveler.chat.repository.ChannelAuthoritiesRepo;
+import server.koraveler.chat.repository.ChannelsRepo;
 import server.koraveler.chat.service.ChannelMemberService;
 import server.koraveler.chat.exception.CustomException;
 import server.koraveler.chat.exception.ErrorCode;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 @Slf4j
 @Service
@@ -25,9 +33,12 @@ import java.util.List;
 public class ChannelMemberServiceImpl implements ChannelMemberService {
 
     private final ChannelMembersRepo channelMembersRepo;
+    private final ChannelsRepo channelsRepo;
     private final ChannelAuthoritiesRepo channelAuthoritiesRepo;
+    private final ChannelMapper channelMapper;
 
     @Override
+    @Transactional
     public ChannelMemberResponse addMember(String channelId, String userId, String addedByUserId) {
         log.info("Adding member {} to channel {} by {}", userId, channelId, addedByUserId);
 
@@ -36,7 +47,7 @@ public class ChannelMemberServiceImpl implements ChannelMemberService {
             throw new CustomException(ErrorCode.ALREADY_CHANNEL_MEMBER);
         }
 
-        // 멤버 추가 권한 확인
+        // 멤버 추가 권한 확인 (자기 자신을 추가하는 경우는 권한 체크 생략)
         if (!addedByUserId.equals(userId) && !hasAddMemberPermission(channelId, addedByUserId)) {
             throw new CustomException(ErrorCode.UNAUTHORIZED_ADD_MEMBER);
         }
@@ -56,6 +67,33 @@ public class ChannelMemberServiceImpl implements ChannelMemberService {
                 .build();
 
         ChannelMembers savedMember = channelMembersRepo.save(member);
+
+        // 새 멤버에게 기본 권한 부여 (이미 권한이 없는 경우에만)
+        if (!channelAuthoritiesRepo.existsByChannelIdAndUserId(channelId, userId)) {
+            // 채널 정보를 가져와서 생성자인지 확인
+            Channels channel = channelsRepo.findById(channelId)
+                    .orElseThrow(() -> new CustomException(ErrorCode.CHANNEL_NOT_FOUND));
+
+            boolean isOwner = channel.getCreatedUserId().equals(userId);
+
+            ChannelAuthorities memberAuthority = ChannelAuthorities.builder()
+                    .channelId(channelId)
+                    .userId(userId)
+                    .roleId(isOwner ? "OWNER" : "MEMBER")
+                    .permissions(isOwner ?
+                            List.of("ADD_MEMBER", "REMOVE_MEMBER", "UPDATE_MEMBER",
+                                    "UPDATE_ROLE", "MUTE_MEMBER", "BAN_MEMBER",
+                                    "DELETE_MESSAGE", "UPDATE_CHANNEL", "DELETE_CHANNEL") :
+                            List.of("READ_MESSAGE", "SEND_MESSAGE", "LEAVE_CHANNEL"))
+                    .grantedByUserId(addedByUserId)
+                    .grantedAt(LocalDateTime.now())
+                    .createdAt(LocalDateTime.now())
+                    .updatedAt(LocalDateTime.now())
+                    .build();
+
+            channelAuthoritiesRepo.save(memberAuthority);
+            log.info("Member authorities created for user: {} in channel: {}", userId, channelId);
+        }
 
         log.info("Member {} added to channel {} successfully", userId, channelId);
         return toChannelMemberResponse(savedMember);
@@ -230,9 +268,15 @@ public class ChannelMemberServiceImpl implements ChannelMemberService {
     @Override
     @Transactional(readOnly = true)
     public boolean hasPermission(String channelId, String userId, String permission) {
-        // 권한 확인 로직
-        // ChannelAuthorities와 ChannelRoles를 조인해서 권한 확인
-        return channelAuthoritiesRepo.hasPermission(channelId, userId, permission);
+        // 권한 확인 로직 - null 처리 추가
+        log.debug("Checking permission for channelId: {}, userId: {}, permission: {}",
+                channelId, userId, permission);
+
+        Boolean result = channelAuthoritiesRepo.hasPermission(channelId, userId, permission);
+        boolean hasPermission = result != null && result;
+
+        log.debug("Permission check result: {}", hasPermission);
+        return hasPermission;
     }
 
     @Override
@@ -296,5 +340,54 @@ public class ChannelMemberServiceImpl implements ChannelMemberService {
                 .mutedUntil(member.getMutedUntil())
                 // 추가 정보는 별도 조회 후 설정
                 .build();
+    }
+
+    // ChannelServiceImpl.java에 추가할 메서드들
+
+    private void validateChannelJoin(Channels channel, ChannelJoinRequest request, String userId) {
+        // 아카이브된 채널 체크
+        if (channel.getIsArchived() != null && channel.getIsArchived()) {
+            throw new CustomException(ErrorCode.ARCHIVED_CHANNEL);
+        }
+
+        // 최대 멤버 수 체크
+        if (channel.getMaxMembers() != null &&
+                channel.getMemberCount() != null &&
+                channel.getMemberCount() >= channel.getMaxMembers()) {
+            throw new CustomException(ErrorCode.CHANNEL_FULL);
+        }
+
+        // 비공개 채널 비밀번호 체크
+        if (channel.getChannelType() == ChannelType.PRIVATE &&
+                channel.getPassword() != null) {
+            if (request.getPassword() == null ||
+                    !request.getPassword().equals(channel.getPassword())) {
+                throw new CustomException(ErrorCode.INVALID_CHANNEL_PASSWORD);
+            }
+        }
+
+        // 승인 필요한 채널 체크
+        if (channel.getRequiresApproval() != null && channel.getRequiresApproval()) {
+            // 승인 요청 로직 - 나중에 구현
+            throw new CustomException(ErrorCode.CHANNEL_APPROVAL_REQUIRED);
+        }
+    }
+
+    private void enrichChannelResponse(ChannelResponse response, String userId) {
+        // 사용자별 추가 정보 설정
+        Optional<ChannelMembers> memberOpt = channelMembersRepo.findByChannelIdAndUserId(
+                response.getId(), userId);
+
+        if (memberOpt.isPresent()) {
+            ChannelMembers member = memberOpt.get();
+            response.setIsMember(true);
+            response.setIsMuted(member.getIsMuted());
+            // 안 읽은 메시지 수는 나중에 구현
+            response.setUnreadMessageCount(0);
+        } else {
+            response.setIsMember(false);
+            response.setIsMuted(false);
+            response.setUnreadMessageCount(0);
+        }
     }
 }

@@ -15,7 +15,6 @@ public enum ErrorCode {
 
     REFESHTOKEN_EXPIRED(HttpStatus.UNAUTHORIZED,"RefreshToken expired"),
     ACCESSTOKEN_NULL(HttpStatus.NOT_FOUND, "AccessToken is null");
-
     private HttpStatus status;
     private String msg;
 

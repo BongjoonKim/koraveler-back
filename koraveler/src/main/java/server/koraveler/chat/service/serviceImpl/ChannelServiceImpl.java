@@ -8,10 +8,13 @@ import org.springframework.transaction.annotation.Transactional;
 import server.koraveler.chat.dto.request.*;
 import server.koraveler.chat.dto.response.*;
 import server.koraveler.chat.dto.mapper.ChannelMapper;
+import server.koraveler.chat.model.entities.ChannelAuthorities;
 import server.koraveler.chat.model.entities.Channels;
 import server.koraveler.chat.model.entities.ChannelMembers;
 import server.koraveler.chat.model.enums.ChannelType;
 import server.koraveler.chat.model.enums.MemberStatus;
+import server.koraveler.chat.model.enums.NotificationLevel;
+import server.koraveler.chat.repository.ChannelAuthoritiesRepo;
 import server.koraveler.chat.repository.ChannelsRepo;
 import server.koraveler.chat.repository.ChannelMembersRepo;
 import server.koraveler.chat.service.ChannelService;
@@ -34,6 +37,7 @@ public class ChannelServiceImpl implements ChannelService {
 
     private final ChannelsRepo channelsRepo;
     private final ChannelMembersRepo channelMembersRepo;
+    private final ChannelAuthoritiesRepo channelAuthoritiesRepo;  // 추가
     private final ChannelMemberService channelMemberService;
     private final ChannelMapper channelMapper;
 
@@ -252,6 +256,29 @@ public class ChannelServiceImpl implements ChannelService {
         // 멤버십 추가
         channelMemberService.addMember(channelId, userId, userId);
 
+        // *** 추가 필요: 권한도 추가 ***
+        if (!channelAuthoritiesRepo.existsByChannelIdAndUserId(channelId, userId)) {
+            // 채널 생성자인지 확인
+            boolean isOwner = channel.getCreatedUserId().equals(userId);
+
+            ChannelAuthorities authority = ChannelAuthorities.builder()
+                    .channelId(channelId)
+                    .userId(userId)
+                    .roleId(isOwner ? "OWNER" : "MEMBER")
+                    .permissions(isOwner ?
+                            List.of("ADD_MEMBER", "REMOVE_MEMBER", "UPDATE_MEMBER",
+                                    "UPDATE_ROLE", "MUTE_MEMBER", "BAN_MEMBER",
+                                    "DELETE_MESSAGE", "UPDATE_CHANNEL", "DELETE_CHANNEL") :
+                            List.of("READ_MESSAGE", "SEND_MESSAGE", "LEAVE_CHANNEL"))
+                    .grantedByUserId(userId)
+                    .grantedAt(LocalDateTime.now())
+                    .createdAt(LocalDateTime.now())
+                    .updatedAt(LocalDateTime.now())
+                    .build();
+
+            channelAuthoritiesRepo.save(authority);
+        }
+
         // 멤버 수 업데이트
         if (channel.getMemberCount() == null) {
             channel.setMemberCount(1);
@@ -267,29 +294,104 @@ public class ChannelServiceImpl implements ChannelService {
     public ChannelResponse createChannel(ChannelCreateRequest request, String userId) {
         log.info("Creating channel: {} by user: {}", request.getName(), userId);
 
-        // 채널명 중복 체크 (같은 타입에서)
+        // 채널 이름 중복 확인
         if (channelsRepo.existsByNameAndChannelType(request.getName(), request.getChannelType())) {
             throw new CustomException(ErrorCode.DUPLICATE_CHANNEL_NAME);
         }
 
         // 채널 생성
         Channels channel = channelMapper.toEntity(request, userId);
+        channel.setMemberCount(1); // 초기값 설정
         Channels savedChannel = channelsRepo.save(channel);
 
         // 생성자를 채널 멤버로 추가
-        channelMemberService.addMember(savedChannel.getId(), userId, userId);
+        ChannelMembers creator = ChannelMembers.builder()
+                .channelId(savedChannel.getId())
+                .userId(userId)
+                .status(MemberStatus.ACTIVE)
+                .joinedAt(LocalDateTime.now())
+                .lastSeenAt(LocalDateTime.now())
+                .notificationLevel(NotificationLevel.ALL)
+                .isMuted(false)
+                .createdAt(LocalDateTime.now())
+                .updatedAt(LocalDateTime.now())
+                .build();
+
+        channelMembersRepo.save(creator);
+        log.info("Channel creator membership created for user: {} in channel: {}", userId, savedChannel.getId());
+
+        // 생성자에게 채널 관리자 권한 부여
+        ChannelAuthorities ownerAuthority = ChannelAuthorities.builder()
+                .channelId(savedChannel.getId())
+                .userId(userId)
+                .roleId("OWNER")
+                .permissions(List.of(
+                        "ADD_MEMBER", "REMOVE_MEMBER", "UPDATE_MEMBER",
+                        "UPDATE_ROLE", "MUTE_MEMBER", "BAN_MEMBER",
+                        "DELETE_MESSAGE", "UPDATE_CHANNEL", "DELETE_CHANNEL"
+                ))
+                .grantedByUserId(userId)
+                .grantedAt(LocalDateTime.now())
+                .createdAt(LocalDateTime.now())
+                .updatedAt(LocalDateTime.now())
+                .build();
+
+        channelAuthoritiesRepo.save(ownerAuthority);
+        log.info("Channel owner authorities created for user: {} in channel: {}", userId, savedChannel.getId());
 
         // 초기 멤버들 추가 (있는 경우)
-        if (request.getInitialMemberIds() != null) {
+        if (request.getInitialMemberIds() != null && !request.getInitialMemberIds().isEmpty()) {
+            int additionalMembers = 0;
             for (String memberId : request.getInitialMemberIds()) {
                 if (!memberId.equals(userId)) {
-                    channelMemberService.addMember(savedChannel.getId(), memberId, userId);
+                    try {
+                        // 멤버 추가
+                        ChannelMembers member = ChannelMembers.builder()
+                                .channelId(savedChannel.getId())
+                                .userId(memberId)
+                                .status(MemberStatus.ACTIVE)
+                                .joinedAt(LocalDateTime.now())
+                                .lastSeenAt(LocalDateTime.now())
+                                .notificationLevel(NotificationLevel.ALL)
+                                .isMuted(false)
+                                .createdAt(LocalDateTime.now())
+                                .updatedAt(LocalDateTime.now())
+                                .build();
+
+                        channelMembersRepo.save(member);
+                        additionalMembers++;
+
+                        // 일반 멤버 권한 부여
+                        ChannelAuthorities memberAuthority = ChannelAuthorities.builder()
+                                .channelId(savedChannel.getId())
+                                .userId(memberId)
+                                .roleId("MEMBER")
+                                .permissions(List.of("READ_MESSAGE", "SEND_MESSAGE", "LEAVE_CHANNEL"))
+                                .grantedByUserId(userId)
+                                .grantedAt(LocalDateTime.now())
+                                .createdAt(LocalDateTime.now())
+                                .updatedAt(LocalDateTime.now())
+                                .build();
+
+                        channelAuthoritiesRepo.save(memberAuthority);
+                    } catch (Exception e) {
+                        log.error("Failed to add initial member {} to channel {}: {}",
+                                memberId, savedChannel.getId(), e.getMessage());
+                    }
                 }
             }
+
+            // 실제 추가된 멤버 수로 업데이트
+            savedChannel.setMemberCount(1 + additionalMembers);
+            savedChannel = channelsRepo.save(savedChannel);
         }
 
-        log.info("Channel created successfully: {}", savedChannel.getId());
-        return channelMapper.toResponse(savedChannel);
+        log.info("Channel created successfully: {} with {} members",
+                savedChannel.getId(), savedChannel.getMemberCount());
+
+        ChannelResponse response = channelMapper.toResponse(savedChannel);
+        enrichChannelResponse(response, userId);
+        return response;
     }
 
     @Override
@@ -398,19 +500,24 @@ public class ChannelServiceImpl implements ChannelService {
     @Override
     @Transactional(readOnly = true)
     public ChannelListResponse getUserChannels(String userId, PageRequest pageRequest) {
-        List<String> userChannelIds = getUserChannelIds(userId);
+        // 1. 멤버로 참여한 채널 ID 조회
+        List<String> memberChannelIds = channelMembersRepo.findByUserIdAndStatus(userId, MemberStatus.ACTIVE)
+                .stream()
+                .map(ChannelMembers::getChannelId)
+                .collect(Collectors.toList());
 
-        if (userChannelIds.isEmpty()) {
-            // 생성자 채널도 확인
-            List<Channels> createdChannels = channelsRepo.findByCreatedUserIdAndIsArchivedFalse(userId);
-            if (!createdChannels.isEmpty()) {
-                userChannelIds = createdChannels.stream()
-                        .map(Channels::getId)
-                        .collect(Collectors.toList());
-            }
-        }
+        // 2. 생성자로서의 채널 ID 조회
+        List<String> createdChannelIds = channelsRepo.findByCreatedUserIdAndIsArchivedFalse(userId)
+                .stream()
+                .map(Channels::getId)
+                .collect(Collectors.toList());
 
-        if (userChannelIds.isEmpty()) {
+        // 3. 중복 제거하여 합치기
+        Set<String> allChannelIds = new HashSet<>();
+        allChannelIds.addAll(memberChannelIds);
+        allChannelIds.addAll(createdChannelIds);
+
+        if (allChannelIds.isEmpty()) {
             return ChannelListResponse.builder()
                     .channels(List.of())
                     .totalCount(0)
@@ -420,12 +527,10 @@ public class ChannelServiceImpl implements ChannelService {
 
         Pageable pageable = createPageable(pageRequest);
 
-        // 단순한 메서드 사용
-        List<Channels> channels = channelsRepo.findByIdIn(userChannelIds, pageable);
+        // 4. 채널 조회
+        List<Channels> channels = channelsRepo.findByIdIn(new ArrayList<>(allChannelIds), pageable);
 
-        // 또는 findAllById 사용
-        // List<Channels> channels = channelsRepo.findAllById(userChannelIds);
-
+        // 5. 응답 생성 시 실제 멤버 수 반영
         List<ChannelResponse> channelResponses = channels.stream()
                 .filter(channel -> channel.getIsArchived() == null || !channel.getIsArchived())
                 .map(channel -> {
@@ -437,7 +542,7 @@ public class ChannelServiceImpl implements ChannelService {
 
         return ChannelListResponse.builder()
                 .channels(channelResponses)
-                .totalCount(userChannelIds.size())
+                .totalCount(allChannelIds.size())
                 .hasNext(channels.size() == pageRequest.getSize())
                 .build();
     }
@@ -510,19 +615,49 @@ public class ChannelServiceImpl implements ChannelService {
         validateChannelJoin(channel, request, userId);
 
         // 멤버 추가
-        channelMemberService.addMember(channelId, userId, userId);
+        ChannelMembers newMember = ChannelMembers.builder()
+                .channelId(channelId)
+                .userId(userId)
+                .status(MemberStatus.ACTIVE)
+                .joinedAt(LocalDateTime.now())
+                .lastSeenAt(LocalDateTime.now())
+                .notificationLevel(NotificationLevel.ALL)
+                .isMuted(false)
+                .createdAt(LocalDateTime.now())
+                .updatedAt(LocalDateTime.now())
+                .build();
 
-        // 멤버 수 업데이트
-        channel.setMemberCount(channel.getMemberCount() + 1);
+        channelMembersRepo.save(newMember);
+
+        // 일반 멤버 권한 부여
+        ChannelAuthorities memberAuthority = ChannelAuthorities.builder()
+                .channelId(channelId)
+                .userId(userId)
+                .roleId("MEMBER")
+                .permissions(List.of("READ_MESSAGE", "SEND_MESSAGE", "LEAVE_CHANNEL"))
+                .grantedByUserId(userId)
+                .grantedAt(LocalDateTime.now())
+                .createdAt(LocalDateTime.now())
+                .updatedAt(LocalDateTime.now())
+                .build();
+
+        channelAuthoritiesRepo.save(memberAuthority);
+
+        // 실제 활성 멤버 수로 업데이트
+        Long actualMemberCount = channelMembersRepo.countActiveMembers(channelId);
+        channel.setMemberCount(actualMemberCount.intValue());
         channelsRepo.save(channel);
 
-        log.info("User {} joined channel {} successfully", userId, channelId);
+        log.info("User {} joined channel {} successfully. Total members: {}",
+                userId, channelId, actualMemberCount);
 
         ChannelResponse response = channelMapper.toResponse(channel);
         enrichChannelResponse(response, userId);
         return response;
     }
 
+
+    // 5. 채널 탈퇴 시 멤버 수 동기화
     @Override
     public void leaveChannel(String channelId, String userId) {
         log.info("User {} leaving channel: {}", userId, channelId);
@@ -531,19 +666,30 @@ public class ChannelServiceImpl implements ChannelService {
                 .orElseThrow(() -> new CustomException(ErrorCode.CHANNEL_NOT_FOUND));
 
         // 채널 멤버인지 확인
-        if (!channelMembersRepo.existsByChannelIdAndUserId(channelId, userId)) {
-            throw new CustomException(ErrorCode.NOT_CHANNEL_MEMBER);
+        ChannelMembers member = channelMembersRepo.findByChannelIdAndUserId(channelId, userId)
+                .orElseThrow(() -> new CustomException(ErrorCode.NOT_CHANNEL_MEMBER));
+
+        // 멤버 상태를 LEFT로 변경 (소프트 삭제)
+        member.setStatus(MemberStatus.LEFT);
+        member.setLeftAt(LocalDateTime.now());
+        member.setUpdatedAt(LocalDateTime.now());
+        channelMembersRepo.save(member);
+
+        // 권한 정보 삭제
+        ChannelAuthorities authority = channelAuthoritiesRepo.findByChannelIdAndUserId(channelId, userId);
+        if (authority != null) {
+            channelAuthoritiesRepo.delete(authority);
         }
 
-        // 멤버 제거
-        channelMemberService.removeMember(channelId, userId, userId);
-
-        // 멤버 수 업데이트
-        channel.setMemberCount(Math.max(0, channel.getMemberCount() - 1));
+        // 실제 활성 멤버 수로 업데이트
+        Long actualMemberCount = channelMembersRepo.countActiveMembers(channelId);
+        channel.setMemberCount(actualMemberCount.intValue());
         channelsRepo.save(channel);
 
-        log.info("User {} left channel {} successfully", userId, channelId);
+        log.info("User {} left channel {} successfully. Remaining members: {}",
+                userId, channelId, actualMemberCount);
     }
+
 
     @Override
     public ChannelResponse updateChannelSettings(String channelId, ChannelSettingsRequest request, String userId) {
@@ -660,6 +806,10 @@ public class ChannelServiceImpl implements ChannelService {
     }
 
     private void enrichChannelResponse(ChannelResponse response, String userId) {
+        // 실제 활성 멤버 수를 DB에서 조회
+        Long actualMemberCount = channelMembersRepo.countActiveMembers(response.getId());
+        response.setMemberCount(actualMemberCount.intValue());
+
         // 사용자별 추가 정보 설정
         ChannelMembers member = channelMembersRepo.findByChannelIdAndUserId(
                 response.getId(), userId).orElse(null);
@@ -669,11 +819,24 @@ public class ChannelServiceImpl implements ChannelService {
             response.setIsMuted(member.getIsMuted());
             response.setUnreadMessageCount(calculateUnreadCount(response.getId(), userId));
             // 역할 정보 설정
-            // response.setMyRole(getUserRole(response.getId(), userId));
+            ChannelAuthorities authority = channelAuthoritiesRepo.findByChannelIdAndUserId(
+                    response.getId(), userId);
+            if (authority != null) {
+                response.setMyRole(authority.getRoleId());
+            }
         } else {
-            response.setIsMember(false);
-            response.setIsMuted(false);
-            response.setUnreadMessageCount(0);
+            // 채널 생성자인지 확인
+            Channels channel = channelsRepo.findById(response.getId()).orElse(null);
+            if (channel != null && channel.getCreatedUserId().equals(userId)) {
+                response.setIsMember(true);
+                response.setMyRole("OWNER");
+                response.setIsMuted(false);
+                response.setUnreadMessageCount(0);
+            } else {
+                response.setIsMember(false);
+                response.setIsMuted(false);
+                response.setUnreadMessageCount(0);
+            }
         }
     }
 

@@ -47,28 +47,22 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             return;
         }
 
-        final String requestTokenHeader = request.getHeader("Authorization");
+        // 토큰 추출
+        String accessToken = extractToken(request);
 
-        // Bearer 토큰이 없는 경우
-        if (requestTokenHeader == null || !requestTokenHeader.startsWith("Bearer ")) {
-            log.warn("JWT Token does not begin with Bearer String");
+        // 토큰이 없는 경우 - 그냥 진행
+        if (accessToken == null) {
             chain.doFilter(request, response);
             return;
         }
 
-        String accessToken = requestTokenHeader.substring(7);
-
         try {
-            // ✅ 인스턴스 메서드로 호출
             Claims claims = jwtTokenUtil.verifyToken(accessToken);
             String username = claims.getSubject();
 
-            // SecurityContext에 인증 정보가 없는 경우에만 설정
             if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-
                 UserDetails userDetails = customUserDetailService.loadUserByUsername(username);
 
-                // 토큰 유효성 추가 검증
                 if (jwtTokenUtil.validateToken(accessToken, userDetails)) {
                     UsernamePasswordAuthenticationToken authentication =
                             new UsernamePasswordAuthenticationToken(
@@ -81,36 +75,62 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 }
             }
 
-            // 인증 성공 시 다음 필터로 진행
-            chain.doFilter(request, response);
-
         } catch (ExpiredJwtException e) {
-            log.error("JWT Token has expired", e);
-            sendUnauthorizedError(response, "Token expired");
-            // ✅ 중요: return으로 필터 체인 중단
-            return;
+            // 만료된 토큰 - 로그만 남기고 에러 응답하지 않음 (서버 시작 시 문제 방지)
+            log.debug("JWT Token has expired for path: {}", path);
+
+            // API 요청인 경우에만 에러 응답
+            if (path.startsWith("/api/") && !path.startsWith("/api/auth/")) {
+                sendUnauthorizedError(response, "Token expired");
+                return;
+            }
 
         } catch (JwtException e) {
-            log.error("Invalid JWT Token", e);
-            sendUnauthorizedError(response, "Invalid token");
-            return;
+            log.debug("Invalid JWT Token for path: {}", path);
+
+            if (path.startsWith("/api/") && !path.startsWith("/api/auth/")) {
+                sendUnauthorizedError(response, "Invalid token");
+                return;
+            }
 
         } catch (Exception e) {
-            log.error("Unable to process JWT Token", e);
-            sendUnauthorizedError(response, "Authentication failed");
-            return;
+            log.debug("Unable to process JWT Token: {}", e.getMessage());
         }
+
+        // 모든 경우에 다음 필터로 진행
+        chain.doFilter(request, response);
     }
 
     private boolean shouldSkipAuthentication(String path, String method) {
         return "OPTIONS".equalsIgnoreCase(method) ||
-                path.contains("ps") ||
                 path.equals("/") ||
+                path.equals("/favicon.ico") ||
                 path.equals("/health") ||
                 path.startsWith("/actuator") ||
                 path.startsWith("/api/auth/login") ||
                 path.startsWith("/api/auth/register") ||
-                path.startsWith("/api/auth/refresh");
+                path.startsWith("/api/auth/refresh") ||
+                path.startsWith("/api/public/") ||
+                path.startsWith("/ws/**") ||  // WebSocket
+                path.startsWith("/static/") ||  // 정적 리소스
+                path.startsWith("/css/") ||
+                path.startsWith("/js/") ||
+                path.startsWith("/images/");
+    }
+
+    private String extractToken(HttpServletRequest request) {
+        String requestTokenHeader = request.getHeader("Authorization");
+        if (requestTokenHeader != null && requestTokenHeader.startsWith("Bearer ")) {
+            return requestTokenHeader.substring(7);
+        }
+
+        String tokenParam = request.getParameter("token");
+        if (tokenParam != null && !tokenParam.isEmpty()) {
+            log.debug("Token extracted from URL parameter");
+            return tokenParam;
+        }
+
+        return null;
     }
 
     private void sendUnauthorizedError(HttpServletResponse response, String message)

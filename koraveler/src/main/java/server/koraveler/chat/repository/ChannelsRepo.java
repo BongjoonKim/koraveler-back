@@ -31,6 +31,7 @@ public interface ChannelsRepo extends MongoRepository<Channels, String> {
     // 5. 생성자 + isArchived 조건
     List<Channels> findByCreatedUserIdAndIsArchivedNot(String userId, Boolean archived);
 
+
     // 채널명 중복 체크
     boolean existsByNameAndChannelType(String name, ChannelType channelType);
 
