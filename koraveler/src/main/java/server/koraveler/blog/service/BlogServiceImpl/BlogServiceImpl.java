@@ -235,7 +235,6 @@ public class BlogServiceImpl implements BlogService {
         } catch (Exception e) {
             throw e;
         }
-
     }
 
     @Override
