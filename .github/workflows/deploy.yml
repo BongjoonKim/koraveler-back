@@ -2,7 +2,7 @@ name: Deploy to EC2
 
 on:
   push:
-    branches: [ master ]
+    branches: [ production ]
 
 jobs:
   deploy:
@@ -168,7 +168,7 @@ jobs:
             echo "========================================="
             cd ~/koraveler-back
             git fetch --all
-            git reset --hard origin/master
+            git reset --hard origin/production
             git pull
           
             # 다시 koraveler 폴더로 이동
