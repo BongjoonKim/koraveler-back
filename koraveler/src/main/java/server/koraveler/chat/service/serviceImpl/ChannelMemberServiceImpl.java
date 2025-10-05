@@ -19,8 +19,8 @@ import server.koraveler.chat.repository.ChannelMembersRepo;
 import server.koraveler.chat.repository.ChannelAuthoritiesRepo;
 import server.koraveler.chat.repository.ChannelsRepo;
 import server.koraveler.chat.service.ChannelMemberService;
-import server.koraveler.chat.exception.CustomException;
-import server.koraveler.chat.exception.ErrorCode;
+import server.koraveler.error.CustomException;
+import server.koraveler.error.ErrorCode;
 
 import java.time.LocalDateTime;
 import java.util.List;

@@ -19,8 +19,6 @@ import server.koraveler.chat.repository.ChannelsRepo;
 import server.koraveler.chat.repository.ChannelMembersRepo;
 import server.koraveler.chat.service.ChannelService;
 import server.koraveler.chat.service.ChannelMemberService;
-import server.koraveler.chat.exception.CustomException;
-import server.koraveler.chat.exception.ErrorCode;
 
 import java.time.LocalDateTime;
 import java.util.*;
@@ -28,6 +26,8 @@ import java.util.stream.Collectors;
 
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import server.koraveler.error.CustomException;
+import server.koraveler.error.ErrorCode;
 
 @Slf4j
 @Service
