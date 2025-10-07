@@ -83,23 +83,25 @@ public class TranslationServiceImpl implements TranslationService {
                         .translatedAt(duplicate.getCreated())
                         .fromCache(true)
                         .isLiked(duplicate.isLiked())
+                        .pronunciation(duplicate.getPronunciation())
                         .build();
                 return response;
             }
         }
 
-        // OpenAI API 호출하여 번역
-        String translatedText = callOpenAiApi(request);
+        // OpenAI API 호출하여 번역 및 발음 받기
+        TranslationWithPronunciation result = callOpenAiApiWithPronunciation(request);
 
         // 번역 이력 저장
         TranslationHistory history = TranslationHistory.builder()
                 .userId(userId)
                 .sourceText(request.getSourceText())
-                .targetText(translatedText)
+                .targetText(result.getTranslation())
                 .sourceLanguage(request.getSourceLanguage())
                 .targetLanguage(request.getTargetLanguage())
+                .pronunciation(result.getPronunciation())
                 .isLiked(false)
-                .expireAt(LocalDateTime.now().plusDays(30)) // 30일 후 자동 삭제
+                .expireAt(LocalDateTime.now().plusDays(30))
                 .build();
         history.setCreated(LocalDateTime.now());
         history.setUpdated(LocalDateTime.now());
@@ -115,17 +117,13 @@ public class TranslationServiceImpl implements TranslationService {
                 .translatedAt(savedHistory.getCreated())
                 .fromCache(fromCache)
                 .isLiked(savedHistory.isLiked())
+                .pronunciation(savedHistory.getPronunciation())
                 .build();
-
-        // 한국어인 경우 발음 추가
-        if ("ko".equals(request.getTargetLanguage())) {
-            response.setPronunciation(generateKoreanPronunciation(translatedText));
-        }
 
         return response;
     }
 
-    private String callOpenAiApi(TranslationRequest request) {
+    private TranslationWithPronunciation callOpenAiApiWithPronunciation(TranslationRequest request) {
         try {
             HttpHeaders headers = new HttpHeaders();
             headers.set("Authorization", "Bearer " + openAiKey);
@@ -139,8 +137,10 @@ public class TranslationServiceImpl implements TranslationService {
             systemMessage.put("role", "system");
             systemMessage.put("content", String.format(
                     "You are a professional translator. Translate the following text from %s to %s. " +
-                            "Provide only the translated text without any additional explanation. " +
-                            "Consider the context: %s",
+                            "Additionally, provide a romanized pronunciation guide (using Latin alphabet) for the translated text. " +
+                            "Respond ONLY in this JSON format without any markdown or code blocks:\n" +
+                            "{\"translation\": \"translated text here\", \"pronunciation\": \"romanized pronunciation here\"}\n" +
+                            "Context: %s",
                     getLanguageName(request.getSourceLanguage()),
                     getLanguageName(request.getTargetLanguage()),
                     request.getContext() != null ? request.getContext() : "general"
@@ -153,8 +153,8 @@ public class TranslationServiceImpl implements TranslationService {
             messages.add(userMessage);
 
             requestBody.put("messages", messages);
-            requestBody.put("temperature", 0.3);
-            requestBody.put("max_tokens", 2000);
+            requestBody.put("temperature", 1);
+            requestBody.put("max_completion_tokens", 2000);
 
             HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
 
@@ -171,7 +171,20 @@ public class TranslationServiceImpl implements TranslationService {
                 if (!choices.isEmpty()) {
                     Map<String, Object> choice = choices.get(0);
                     Map<String, String> message = (Map<String, String>) choice.get("message");
-                    return message.get("content").trim();
+                    String content = message.get("content").trim();
+
+                    // JSON 파싱
+                    try {
+                        Map<String, String> translationResult = objectMapper.readValue(content, Map.class);
+                        return new TranslationWithPronunciation(
+                                translationResult.get("translation"),
+                                translationResult.get("pronunciation")
+                        );
+                    } catch (Exception e) {
+                        log.warn("Failed to parse JSON response, using fallback", e);
+                        // JSON 파싱 실패 시 전체를 번역으로 처리
+                        return new TranslationWithPronunciation(content, null);
+                    }
                 }
             }
 
@@ -179,8 +192,10 @@ public class TranslationServiceImpl implements TranslationService {
 
         } catch (Exception e) {
             log.error("Error calling OpenAI API: ", e);
-            // 폴백: 간단한 에러 메시지 반환
-            return "Translation failed: " + e.getMessage();
+            return new TranslationWithPronunciation(
+                    "Translation failed: " + e.getMessage(),
+                    null
+            );
         }
     }
 
@@ -202,22 +217,16 @@ public class TranslationServiceImpl implements TranslationService {
         return languages.getOrDefault(code, code);
     }
 
-    private String generateKoreanPronunciation(String koreanText) {
-        // 간단한 한글 로마자 변환 (실제로는 더 복잡한 로직 필요)
-        // 여기서는 예시로 간단히 구현
-        return koreanText; // TODO: 실제 발음 생성 로직 구현
-    }
-
     @Override
     @Transactional(readOnly = true)
     public Page<TranslationHistory> getTranslationHistory(String userId, Pageable pageable) {
-        return translationHistoryRepo.findByUserIdOrderByCreatedDateDesc(userId, pageable);
+        return translationHistoryRepo.findByUserIdOrderByCreatedDesc(userId, pageable);
     }
 
     @Override
     @Transactional(readOnly = true)
     public Page<TranslationHistory> getLikedTranslations(String userId, Pageable pageable) {
-        return translationHistoryRepo.findByUserIdAndIsLikedTrueOrderByCreatedDateDesc(userId, pageable);
+        return translationHistoryRepo.findByUserIdAndIsLikedTrueOrderByCreatedDesc(userId, pageable);
     }
 
     @Override
@@ -273,21 +282,6 @@ public class TranslationServiceImpl implements TranslationService {
         );
     }
 
-    @Override
-    @Transactional(readOnly = true)
-    public List<QuickPhrase> getQuickPhrases(String userId, int limit) {
-        List<Map<String, Object>> frequentTexts = translationHistoryCustomRepo.getFrequentlyTranslatedTexts(userId, limit);
-
-        return frequentTexts.stream()
-                .map(item -> new QuickPhrase(
-                        (String) item.get("sourceText"),
-                        (String) item.get("targetText"),
-                        generateKoreanPronunciation((String) item.get("targetText")),
-                        categorizeText((String) item.get("sourceText"))
-                ))
-                .collect(Collectors.toList());
-    }
-
     private String categorizeText(String text) {
         // 간단한 카테고리 분류 로직
         if (text.toLowerCase().contains("hello") || text.toLowerCase().contains("안녕")) {
@@ -331,7 +325,7 @@ public class TranslationServiceImpl implements TranslationService {
         if (onlyLiked) {
             translations = translationHistoryCustomRepo.exportLikedTranslations(userId);
         } else {
-            translations = translationHistoryRepo.findByUserIdOrderByCreatedDateDesc(userId);
+            translations = translationHistoryRepo.findByUserIdOrderByCreatedDesc(userId);
         }
 
         try {
@@ -428,5 +422,24 @@ public class TranslationServiceImpl implements TranslationService {
         return translationHistoryRepo.findRecentDuplicateTranslation(
                 userId, sourceText, sourceLanguage, targetLanguage, since
         ).orElse(null);
+    }
+
+    // 내부 헬퍼 클래스
+    private static class TranslationWithPronunciation {
+        private final String translation;
+        private final String pronunciation;
+
+        public TranslationWithPronunciation(String translation, String pronunciation) {
+            this.translation = translation;
+            this.pronunciation = pronunciation;
+        }
+
+        public String getTranslation() {
+            return translation;
+        }
+
+        public String getPronunciation() {
+            return pronunciation;
+        }
     }
 }

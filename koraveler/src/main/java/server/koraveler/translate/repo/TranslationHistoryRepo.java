@@ -14,13 +14,13 @@ import java.util.Optional;
 @Repository
 public interface TranslationHistoryRepo extends MongoRepository<TranslationHistory, String> {
     // 특정 사용자의 번역 이력 조회 (최신순)
-    Page<TranslationHistory> findByUserIdOrderByCreatedDateDesc(String userId, Pageable pageable);
+    Page<TranslationHistory> findByUserIdOrderByCreatedDesc(String userId, Pageable pageable);
 
     // 특정 사용자의 좋아요한 번역만 조회
-    Page<TranslationHistory> findByUserIdAndIsLikedTrueOrderByCreatedDateDesc(String userId, Pageable pageable);
+    Page<TranslationHistory> findByUserIdAndIsLikedTrueOrderByCreatedDesc(String userId, Pageable pageable);
 
     // 특정 사용자의 모든 번역 이력 조회 (최신순, 페이징 없이)
-    List<TranslationHistory> findByUserIdOrderByCreatedDateDesc(String userId);
+    List<TranslationHistory> findByUserIdOrderByCreatedDesc(String userId);
 
     // 사용자와 ID로 특정 번역 조회 (권한 체크용)
     Optional<TranslationHistory> findByIdAndUserId(String id, String userId);

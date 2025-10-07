@@ -21,11 +21,15 @@ public class TranslationHistory extends CommonDTO {
     private String id;
 
     @Indexed
-    private String userId;  // 소유자
+    private String userId;
+
     private String sourceText;
     private String targetText;
     private String sourceLanguage;
     private String targetLanguage;
+
+    // 발음 정보 (라틴 문자로 표기)
+    private String pronunciation;
 
     @Builder.Default
     private boolean isLiked = false;
@@ -33,7 +37,6 @@ public class TranslationHistory extends CommonDTO {
     @Indexed(expireAfterSeconds = 2592000)
     private LocalDateTime expireAt;
 
-    // 좋아요를 누른 항목은 expireAt을 null로 설정
     public void markAsLiked() {
         this.isLiked = true;
         this.expireAt = null;
