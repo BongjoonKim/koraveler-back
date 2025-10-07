@@ -90,14 +90,6 @@ public interface TranslationService {
                                                         LocalDateTime endDate, Pageable pageable);
 
     /**
-     * 자주 사용하는 구문 조회
-     * @param userId 사용자 ID
-     * @param limit 조회 개수
-     * @return 자주 사용하는 구문 리스트
-     */
-    List<QuickPhrase> getQuickPhrases(String userId, int limit);
-
-    /**
      * 언어별 통계 조회
      * @param userId 사용자 ID
      * @return 언어별 번역 통계

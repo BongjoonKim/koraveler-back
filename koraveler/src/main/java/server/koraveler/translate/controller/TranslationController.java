@@ -162,18 +162,18 @@ public class TranslationController {
     }
 
     // 자주 사용하는 구문 조회
-    @GetMapping("/quick-phrases")
-    public List<QuickPhrase> getQuickPhrases(
-            @RequestParam(defaultValue = "10") int limit,
-            Authentication authentication) {
-        try {
-            String userId = authentication.getName();
-            return translationService.getQuickPhrases(userId, limit);
-        } catch (Exception e) {
-            log.error("Error retrieving quick phrases: ", e);
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, e.getMessage());
-        }
-    }
+//    @GetMapping("/quick-phrases")
+//    public List<QuickPhrase> getQuickPhrases(
+//            @RequestParam(defaultValue = "10") int limit,
+//            Authentication authentication) {
+//        try {
+//            String userId = authentication.getName();
+//            return translationService.getQuickPhrases(userId, limit);
+//        } catch (Exception e) {
+//            log.error("Error retrieving quick phrases: ", e);
+//            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, e.getMessage());
+//        }
+//    }
 
     // 언어별 통계
     @GetMapping("/statistics/languages")
