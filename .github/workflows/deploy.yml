@@ -37,6 +37,7 @@ jobs:
           MONGODB_PASSWORD: ${{ secrets.MONGODB_PASSWORD }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
           WEATHER_API_KEY: ${{ secrets.WEATHER_API_KEY }}
+          OPEN_AI_KEY: ${{ secrets.OPEN_AI_KEY }}
         run: |
           # SSH 키 설정
           echo "$PRIVATE_KEY" > private_key.pem
@@ -129,7 +130,13 @@ jobs:
             weather:
               url: https://api.openweathermap.org/data/2.5/weather
               key: ${WEATHER_API_KEY}
-          
+            openai:
+              translation:
+                model: gpt-5-mini-2025-08-07
+                cache:
+                  enabled: true
+              url: https://api.openai.com/v1/chat/completions
+              key: ${OPEN_AI_KEY}
           jwt:
             secretKey: ${JWT_SECRET}
             expiration: 200000
