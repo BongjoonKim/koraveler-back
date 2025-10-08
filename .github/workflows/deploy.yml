@@ -140,7 +140,6 @@ jobs:
           jwt:
             secretKey: ${JWT_SECRET}
             expiration: 200000
-          
           front:
             url:
               local: http://localhost:3002
