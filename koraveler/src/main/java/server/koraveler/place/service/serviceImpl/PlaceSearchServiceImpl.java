@@ -37,6 +37,9 @@ public class PlaceSearchServiceImpl implements PlaceSearchService {
     @Value("${spring.openai.key}")
     private String openAiKey;
 
+    @Value("${spring.openai.translation.model}")
+    private String aiModel;
+
     @Value("${spring.naver.map.client-id}")
     private String naverClientId;
 
@@ -48,20 +51,26 @@ public class PlaceSearchServiceImpl implements PlaceSearchService {
         log.info("Starting place search for user: {}, keyword: {}", userId, request.getKeyword());
 
         try {
+            // 0. 다국어로된 질문을 한국어로 번역하기
+            String translatedKeyword = translateKorean(request.getKeyword() != null ? request.getKeyword() : "");
+
             // 1. 카카오 API로 장소 검색
-            List<Map<String, Object>> kakaoResults = searchKakaoPlaces(request.getKeyword());
+            List<Map<String, Object>> kakaoResults = searchKakaoPlaces(translatedKeyword);
 
             if (kakaoResults.isEmpty()) {
-                log.info("No results found for keyword: {}", request.getKeyword());
+                log.info("No results found for original keyword: {}", request.getKeyword());
+                log.info("No results found for translated keyword: {}", translatedKeyword);
+
                 return PlaceSearchResponse.builder()
                         .keyword(request.getKeyword())
+                        .translatedKeyword(translatedKeyword)
                         .places(new ArrayList<>())
                         .totalCount(0)
                         .build();
             }
 
             // 2. 검색 결과 처리 및 번역
-            List<PlaceDTO> places = processSearchResults(kakaoResults, userId, request.getKeyword());
+            List<PlaceDTO> places = processSearchResults(kakaoResults, userId, request.getKeyword(), translatedKeyword);
 
             return PlaceSearchResponse.builder()
                     .keyword(request.getKeyword())
@@ -109,7 +118,7 @@ public class PlaceSearchServiceImpl implements PlaceSearchService {
         }
     }
 
-    private List<PlaceDTO> processSearchResults(List<Map<String, Object>> kakaoResults, String userId, String keyword) {
+    private List<PlaceDTO> processSearchResults(List<Map<String, Object>> kakaoResults, String userId, String keyword, String translatedKeyword) {
         List<PlaceDTO> places = new ArrayList<>();
 
         for (Map<String, Object> kakaoPlace : kakaoResults) {
@@ -147,7 +156,7 @@ public class PlaceSearchServiceImpl implements PlaceSearchService {
                 places.add(place);
 
                 // 검색 이력 저장 (비동기 처리 가능)
-                saveSearchHistory(userId, keyword, place);
+                saveSearchHistory(userId, keyword, translatedKeyword, place);
 
             } catch (Exception e) {
                 log.warn("Failed to process place: {}", e.getMessage());
@@ -164,14 +173,15 @@ public class PlaceSearchServiceImpl implements PlaceSearchService {
             headers.set("Content-Type", "application/json");
 
             Map<String, Object> requestBody = new HashMap<>();
-            requestBody.put("model", "gpt-4o-mini");
+            requestBody.put("model", aiModel);
 
             List<Map<String, String>> messages = new ArrayList<>();
             Map<String, String> systemMessage = new HashMap<>();
             systemMessage.put("role", "system");
             systemMessage.put("content",
                     "You are a translator. Translate the given Korean place name and category to English. " +
-                            "Respond ONLY in JSON format: {\"name\": \"translated name\", \"category\": \"translated category\"}"
+                            "Respond ONLY in JSON format without any markdown or code blocks: " +
+                            "{\"name\": \"translated name\", \"category\": \"translated category\"}"
             );
             messages.add(systemMessage);
 
@@ -183,8 +193,7 @@ public class PlaceSearchServiceImpl implements PlaceSearchService {
             messages.add(userMessage);
 
             requestBody.put("messages", messages);
-            requestBody.put("temperature", 0.3);
-            requestBody.put("max_tokens", 100);
+            requestBody.put("max_completion_tokens", 500);
 
             HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
             ResponseEntity<Map> response = restTemplate.exchange(
@@ -202,8 +211,18 @@ public class PlaceSearchServiceImpl implements PlaceSearchService {
                     Map<String, String> message = (Map<String, String>) choice.get("message");
                     String content = message.get("content").trim();
 
-                    Map<String, String> result = objectMapper.readValue(content, Map.class);
-                    return result;
+                    // JSON 파싱 with fallback
+                    try {
+                        Map<String, String> result = objectMapper.readValue(content, Map.class);
+                        return result;
+                    } catch (Exception e) {
+                        log.warn("Failed to parse JSON response: {}", content);
+                        // JSON 파싱 실패 시 fallback으로
+                        Map<String, String> fallback = new HashMap<>();
+                        fallback.put("name", placeName);
+                        fallback.put("category", category != null ? category : "");
+                        return fallback;
+                    }
                 }
             }
 
@@ -216,6 +235,75 @@ public class PlaceSearchServiceImpl implements PlaceSearchService {
         fallback.put("name", placeName);
         fallback.put("category", category != null ? category : "");
         return fallback;
+    }
+
+    private String translateKorean(String sentences) {
+        try {
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("Authorization", "Bearer " + openAiKey);
+            headers.set("Content-Type", "application/json");
+
+            Map<String, Object> requestBody = new HashMap<>();
+            requestBody.put("model", aiModel);
+            List<Map<String, String>> messages = new ArrayList<>();
+            Map<String, String> systemMessage = new HashMap<>();
+            systemMessage.put("role", "system");
+            systemMessage.put("content",
+                    "You are a translator. Translate the given word or name or place written by some language to korean language. " +
+                            "your main purpose is making easy to understand of naver map searching. " +
+                            "Respond ONLY in this JSON format without any markdown or code blocks:\n" +
+                            "{\"translatedKeyword\": \"translated name\"}"
+            );
+
+            Map<String, String> userMessage = new HashMap<>();
+            userMessage.put("role", "user");
+            userMessage.put("content", String.format("Search Keyword: %s", sentences));
+
+            messages.add(systemMessage);
+            messages.add(userMessage);
+
+            requestBody.put("messages", messages);
+            requestBody.put("max_completion_tokens", 500);
+
+            // GPT-5 mini는 추가 파라미터 지원
+            // verbosity: "low", "medium", "high" - 응답 상세도 제어
+            // requestBody.put("verbosity", "low");
+
+            // reasoning_effort: "minimal", "low", "medium", "high" - 추론 깊이 제어
+            // requestBody.put("reasoning_effort", "minimal");
+
+            HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
+            ResponseEntity<Map> response = restTemplate.exchange(
+                    openAiUrl,  // https://api.openai.com/v1/chat/completions
+                    HttpMethod.POST,
+                    entity,
+                    Map.class
+            );
+
+            Map<String, Object> responseBody = response.getBody();
+            if (responseBody != null && responseBody.containsKey("choices")) {
+                List<Map<String, Object>> choices = (List<Map<String, Object>>) responseBody.get("choices");
+                if (!choices.isEmpty()) {
+                    Map<String, Object> choice = choices.get(0);
+                    Map<String, String> message = (Map<String, String>) choice.get("message");
+                    String content = message.get("content").trim();
+
+                    try {
+                        ObjectMapper mapper = new ObjectMapper();
+                        Map<String, String> result = mapper.readValue(content, Map.class);
+                        String translated = result.get("translatedKeyword");
+                        return translated != null ? translated : sentences;
+                    } catch (Exception e) {
+                        log.warn("Failed to parse JSON response: {}, using original", content);
+                        return sentences;
+                    }
+                }
+            }
+            return sentences;
+        } catch (Exception e) {
+            log.error("Translation failed", e);
+            return sentences;
+        }
     }
 
     private Map<String, Object> getNaverGeocode(double lng, double lat) {
@@ -278,11 +366,12 @@ public class PlaceSearchServiceImpl implements PlaceSearchService {
         return result;
     }
 
-    private void saveSearchHistory(String userId, String keyword, PlaceDTO place) {
+    private void saveSearchHistory(String userId, String keyword, String translatedKeyword, PlaceDTO place) {
         try {
             PlaceSearchHistory history = PlaceSearchHistory.builder()
                     .userId(userId)
                     .keyword(keyword)
+                    .translatedKeyword(translatedKeyword)
                     .placeId(place.getId())
                     .name(place.getName())
                     .nameEn(place.getNameEn())

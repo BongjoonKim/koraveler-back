@@ -26,6 +26,7 @@ public class PlaceSearchHistory extends CommonDTO {
     @Indexed
     private String keyword;
 
+    private String translatedKeyword;
     private String placeId;        // 카카오 place id
     private String name;
     private String nameEn;

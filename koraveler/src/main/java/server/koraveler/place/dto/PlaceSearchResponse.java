@@ -13,6 +13,7 @@ import java.util.List;
 @AllArgsConstructor
 public class PlaceSearchResponse {
     private String keyword;
+    private String translatedKeyword;
     private List<PlaceDTO> places;
     private int totalCount;
 }
