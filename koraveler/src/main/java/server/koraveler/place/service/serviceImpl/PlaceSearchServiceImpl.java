@@ -92,7 +92,7 @@ public class PlaceSearchServiceImpl implements PlaceSearchService {
             URI uri = UriComponentsBuilder
                     .fromHttpUrl("https://dapi.kakao.com/v2/local/search/keyword.json")
                     .queryParam("query", keyword)
-                    .queryParam("size", 15)
+                    .queryParam("size", 10)
                     .build()
                     .encode()
                     .toUri();
@@ -121,7 +121,22 @@ public class PlaceSearchServiceImpl implements PlaceSearchService {
     private List<PlaceDTO> processSearchResults(List<Map<String, Object>> kakaoResults, String userId, String keyword, String translatedKeyword) {
         List<PlaceDTO> places = new ArrayList<>();
 
+        // for문 전에 배치 준비
+        List<Map<String, String>> placeInfoList = new ArrayList<>();
         for (Map<String, Object> kakaoPlace : kakaoResults) {
+            Map<String, String> info = new HashMap<>();
+            info.put("name", (String) kakaoPlace.get("place_name"));
+            info.put("category", (String) kakaoPlace.get("category_group_name"));
+            placeInfoList.add(info);
+        }
+
+        // 한 번에 번역
+        List<Map<String, String>> translatedInfoList = translatePlaceInfoBatch(placeInfoList);
+
+        for (int i = 0; i < kakaoResults.size(); i++) {
+            Map<String, Object> kakaoPlace = kakaoResults.get(i);
+            Map<String, String> translatedInfo = translatedInfoList.get(i);
+
             try {
                 // 카카오 데이터 추출
                 String placeId = (String) kakaoPlace.get("id");
@@ -133,11 +148,25 @@ public class PlaceSearchServiceImpl implements PlaceSearchService {
                 double lat = Double.parseDouble((String) kakaoPlace.get("y"));
                 double lng = Double.parseDouble((String) kakaoPlace.get("x"));
 
-                // 주소를 제외한 정보 번역 (place_name, category)
-                Map<String, String> translatedInfo = translatePlaceInfo(placeName, category);
-
                 // 네이버 지오코딩으로 영문 주소 가져오기
-                Map<String, Object> geoInfo = getNaverGeocode(lng, lat);
+                // 도로명 주소가 있으면 우선 사용, 없으면 지번 주소 사용
+                String searchAddress = (roadAddress != null && !roadAddress.isEmpty()) ? roadAddress : address;
+                Map<String, Object> geoInfo = getNaverGeocode(searchAddress, lng, lat);
+
+                // 영문 주소 추출
+                String englishAddress = (String) geoInfo.get("englishAddress");
+
+                // 더 정확한 좌표가 있으면 업데이트
+                if (geoInfo.containsKey("lat") && geoInfo.containsKey("lng")) {
+                    lat = (Double) geoInfo.get("lat");
+                    lng = (Double) geoInfo.get("lng");
+                }
+
+                // 영문 주소가 없으면 GPT로 번역
+                if (englishAddress == null || englishAddress.isEmpty()) {
+                    log.warn("No English address from Naver API for: {}, using GPT translation", searchAddress);
+                    englishAddress = translateAddress(searchAddress);
+                }
 
                 PlaceDTO place = PlaceDTO.builder()
                         .id(placeId)
@@ -148,7 +177,7 @@ public class PlaceSearchServiceImpl implements PlaceSearchService {
                         .phone(phone)
                         .addressKo(address)
                         .roadAddressKo(roadAddress)
-                        .addressEn((String) geoInfo.get("englishAddress"))
+                        .addressEn(englishAddress)
                         .lat(lat)
                         .lng(lng)
                         .build();
@@ -166,7 +195,12 @@ public class PlaceSearchServiceImpl implements PlaceSearchService {
         return places;
     }
 
-    private Map<String, String> translatePlaceInfo(String placeName, String category) {
+    // 주소 번역 대체 메서드 (네이버 API가 실패한 경우)
+    private String translateAddress(String address) {
+        if (address == null || address.isEmpty()) {
+            return "";
+        }
+
         try {
             HttpHeaders headers = new HttpHeaders();
             headers.set("Authorization", "Bearer " + openAiKey);
@@ -179,21 +213,77 @@ public class PlaceSearchServiceImpl implements PlaceSearchService {
             Map<String, String> systemMessage = new HashMap<>();
             systemMessage.put("role", "system");
             systemMessage.put("content",
-                    "You are a translator. Translate the given Korean place name and category to English. " +
-                            "Respond ONLY in JSON format without any markdown or code blocks: " +
-                            "{\"name\": \"translated name\", \"category\": \"translated category\"}"
-            );
+                    "You are a translator specializing in Korean addresses. " +
+                            "Translate the Korean address to English following standard romanization rules. " +
+                            "Keep the structure: building number, street/dong name, gu, city. " +
+                            "Respond ONLY with the translated address, no JSON or explanations.");
             messages.add(systemMessage);
 
             Map<String, String> userMessage = new HashMap<>();
             userMessage.put("role", "user");
-            userMessage.put("content", String.format("Place name: %s, Category: %s",
-                    placeName != null ? placeName : "",
-                    category != null ? category : ""));
+            userMessage.put("content", address);
             messages.add(userMessage);
 
             requestBody.put("messages", messages);
-            requestBody.put("max_completion_tokens", 500);
+            requestBody.put("max_completion_tokens", 200);
+
+            HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
+            ResponseEntity<Map> response = restTemplate.exchange(
+                    openAiUrl,
+                    HttpMethod.POST,
+                    entity,
+                    Map.class
+            );
+
+            Map<String, Object> responseBody = response.getBody();
+            if (responseBody != null && responseBody.containsKey("choices")) {
+                List<Map<String, Object>> choices = (List<Map<String, Object>>) responseBody.get("choices");
+                if (!choices.isEmpty()) {
+                    Map<String, Object> choice = choices.get(0);
+                    Map<String, String> message = (Map<String, String>) choice.get("message");
+                    return message.get("content").trim();
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Failed to translate address: {}", e.getMessage());
+        }
+
+        return address; // 번역 실패시 원본 반환
+    }
+
+    private List<Map<String, String>> translatePlaceInfoBatch(List<Map<String, String>> placeInfoList){
+        try {
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("Authorization", "Bearer " + openAiKey);
+            headers.set("Content-Type", "application/json");
+
+            Map<String, Object> requestBody = new HashMap<>();
+            requestBody.put("model", aiModel);
+
+            List<Map<String, String>> messages = new ArrayList<>();
+            Map<String, String> systemMessage = new HashMap<>();
+            systemMessage.put("role", "system");
+            systemMessage.put("content",
+                    "You are a translator. Translate the given list of Korean place names and categories to English. " +
+                            "Respond ONLY in JSON format without any markdown or code blocks. " +
+                            "Return an array with the same order: " +
+                            "[{\"name\": \"translated name\", \"category\": \"translated category\"}, ...]");
+            messages.add(systemMessage);
+
+            Map<String, String> userMessage = new HashMap<>();
+            userMessage.put("role", "user");
+            try {
+                userMessage.put("content",
+                        "Translate these Korean place names and categories to English:\n" +
+                                objectMapper.writeValueAsString(placeInfoList));
+            } catch (Exception e) {
+                userMessage.put("content", placeInfoList.toString());
+            }
+
+            messages.add(userMessage);
+
+            requestBody.put("messages", messages);
+            requestBody.put("max_completion_tokens", 2000);
 
             HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
             ResponseEntity<Map> response = restTemplate.exchange(
@@ -211,17 +301,25 @@ public class PlaceSearchServiceImpl implements PlaceSearchService {
                     Map<String, String> message = (Map<String, String>) choice.get("message");
                     String content = message.get("content").trim();
 
-                    // JSON 파싱 with fallback
+                    // JSON 파싱 부분을 수정:
                     try {
-                        Map<String, String> result = objectMapper.readValue(content, Map.class);
+                        // List<Map>으로 파싱
+                        List<Map<String, String>> result = objectMapper.readValue(
+                                content,
+                                objectMapper.getTypeFactory().constructCollectionType(List.class, Map.class)
+                        );
                         return result;
                     } catch (Exception e) {
                         log.warn("Failed to parse JSON response: {}", content);
-                        // JSON 파싱 실패 시 fallback으로
-                        Map<String, String> fallback = new HashMap<>();
-                        fallback.put("name", placeName);
-                        fallback.put("category", category != null ? category : "");
-                        return fallback;
+                        // fallback으로 원본 리스트 반환
+                        List<Map<String, String>> fallbackList = new ArrayList<>();
+                        for (Map<String, String> info : placeInfoList) {
+                            Map<String, String> fallback = new HashMap<>();
+                            fallback.put("name", info.get("name"));
+                            fallback.put("category", info.get("category") != null ? info.get("category") : "");
+                            fallbackList.add(fallback);
+                        }
+                        return fallbackList;
                     }
                 }
             }
@@ -230,11 +328,16 @@ public class PlaceSearchServiceImpl implements PlaceSearchService {
             log.warn("Translation failed, using original: {}", e.getMessage());
         }
 
-        // 번역 실패 시 원본 반환
-        Map<String, String> fallback = new HashMap<>();
-        fallback.put("name", placeName);
-        fallback.put("category", category != null ? category : "");
-        return fallback;
+        // 번역 실패 시 원본 리스트 반환 (메서드 끝부분)
+        List<Map<String, String>> fallbackList = new ArrayList<>();
+        for (Map<String, String> info : placeInfoList) {
+            Map<String, String> fallback = new HashMap<>();
+            fallback.put("name", info.get("name"));
+            fallback.put("category", info.get("category") != null ? info.get("category") : "");
+            fallbackList.add(fallback);
+        }
+        return fallbackList;
+
     }
 
     private String translateKorean(String sentences) {
@@ -263,7 +366,7 @@ public class PlaceSearchServiceImpl implements PlaceSearchService {
             messages.add(userMessage);
 
             requestBody.put("messages", messages);
-            requestBody.put("max_completion_tokens", 500);
+            requestBody.put("max_completion_tokens", 1500);
 
             // GPT-5 mini는 추가 파라미터 지원
             // verbosity: "low", "medium", "high" - 응답 상세도 제어
@@ -306,18 +409,112 @@ public class PlaceSearchServiceImpl implements PlaceSearchService {
         }
     }
 
-    private Map<String, Object> getNaverGeocode(double lng, double lat) {
+    private Map<String, Object> getNaverGeocode(String address, double lng, double lat) {
+        Map<String, Object> result = new HashMap<>();
+        result.put("englishAddress", ""); // 기본값
+
+        // 주소가 없으면 빈 결과 반환
+        if (address == null || address.isEmpty()) {
+            return result;
+        }
+
+        try {
+            HttpHeaders headers = new HttpHeaders();
+            // 헤더 이름을 정확하게 대문자로 수정
+            headers.set("X-NCP-APIGW-API-KEY-ID", naverClientId);
+            headers.set("X-NCP-APIGW-API-KEY", naverClientSecret);
+
+            // 정지오코딩 API 사용 (주소 → 좌표 + 상세정보)
+            UriComponentsBuilder builder = UriComponentsBuilder
+                    .fromHttpUrl("https://maps.apigw.ntruss.com/map-geocode/v2/geocode")
+                    .queryParam("query", address);
+
+            // coordinate는 "경도,위도" 형식
+            if (lng != 0 && lat != 0) {
+                builder.queryParam("coordinate", String.format("%.6f,%.6f", lng, lat));
+            }
+
+            URI uri = builder.build().encode().toUri();
+
+            log.debug("Naver Geocoding Request URL: {}", uri.toString());
+
+            HttpEntity<String> entity = new HttpEntity<>(headers);
+            ResponseEntity<Map> response = restTemplate.exchange(
+                    uri,
+                    HttpMethod.GET,
+                    entity,
+                    Map.class
+            );
+
+            Map<String, Object> responseBody = response.getBody();
+            log.debug("Naver Geocoding Response: {}", responseBody);
+
+            if (responseBody != null) {
+                // 응답 상태 확인
+                String status = (String) responseBody.get("status");
+
+                if ("OK".equals(status)) {
+                    List<Map<String, Object>> addresses = (List<Map<String, Object>>) responseBody.get("addresses");
+
+                    if (addresses != null && !addresses.isEmpty()) {
+                        Map<String, Object> firstAddress = addresses.get(0);
+
+                        // 영문 주소 추출
+                        String englishAddress = (String) firstAddress.get("englishAddress");
+
+                        if (englishAddress != null && !englishAddress.isEmpty()) {
+                            result.put("englishAddress", englishAddress);
+                            log.info("Found English address: {}", englishAddress);
+                        }
+
+                        // 추가 정보도 저장 (필요 시)
+                        result.put("jibunAddress", firstAddress.get("jibunAddress"));
+                        result.put("roadAddress", firstAddress.get("roadAddress"));
+
+                        // 좌표 정보 업데이트
+                        if (firstAddress.containsKey("x") && firstAddress.containsKey("y")) {
+                            try {
+                                result.put("lng", Double.parseDouble((String) firstAddress.get("x")));
+                                result.put("lat", Double.parseDouble((String) firstAddress.get("y")));
+                            } catch (NumberFormatException e) {
+                                log.warn("Failed to parse coordinates: x={}, y={}",
+                                        firstAddress.get("x"), firstAddress.get("y"));
+                            }
+                        }
+                    }
+                } else {
+                    log.warn("Geocoding failed with status: {} for address: {}", status, address);
+
+                    // 상태별 처리
+                    if ("INVALID_REQUEST".equals(status)) {
+                        log.error("Invalid request parameters");
+                    } else if ("NOT_FOUND".equals(status)) {
+                        log.info("Address not found in Naver database: {}", address);
+                    }
+                }
+            }
+
+        } catch (Exception e) {
+            log.error("Failed to geocode address: {}, error: {}", address, e.getMessage(), e);
+        }
+
+        return result;
+    }
+
+    // 역지오코딩 (좌표 → 주소) - 백업용
+    private Map<String, Object> reverseGeocode(double lng, double lat) {
         Map<String, Object> result = new HashMap<>();
         result.put("englishAddress", ""); // 기본값
 
         try {
             HttpHeaders headers = new HttpHeaders();
-            headers.set("X-NCP-APIGW-API-KEY-ID", naverClientId);
-            headers.set("X-NCP-APIGW-API-KEY", naverClientSecret);
+            headers.set("x-ncp-apigw-api-key-id", naverClientId);
+            headers.set("x-ncp-apigw-api-key", naverClientSecret);
+            headers.set("Accept-Language", "en"); // 영문 결과 요청
 
             String coords = String.format("%f,%f", lng, lat);
             URI uri = UriComponentsBuilder
-                    .fromHttpUrl("https://maps.apigw.ntruss.com/map-geocode/v2/geocode")
+                    .fromHttpUrl("https://naveropenapi.apigw.ntruss.com/map-reversegeocode/v2/gc")
                     .queryParam("coords", coords)
                     .queryParam("output", "json")
                     .queryParam("orders", "addr,roadaddr")
@@ -343,14 +540,33 @@ public class PlaceSearchServiceImpl implements PlaceSearchService {
                     // 영문 주소 조합
                     StringBuilder englishAddr = new StringBuilder();
 
+                    // land 정보가 있으면 사용
+                    if (firstResult.containsKey("land")) {
+                        Map<String, Object> land = (Map<String, Object>) firstResult.get("land");
+
+                        // building name
+                        if (land.containsKey("name") && !((String)land.get("name")).isEmpty()) {
+                            englishAddr.append(land.get("name"));
+                        }
+
+                        // number1, number2
+                        if (land.containsKey("number1")) {
+                            if (englishAddr.length() > 0) englishAddr.append(", ");
+                            englishAddr.append(land.get("number1"));
+                            if (land.containsKey("number2") && !((String)land.get("number2")).isEmpty()) {
+                                englishAddr.append("-").append(land.get("number2"));
+                            }
+                        }
+                    }
+
                     // area1 ~ area4까지 영문명 추출
                     for (int i = 4; i >= 1; i--) {
                         Map<String, Object> area = (Map<String, Object>) region.get("area" + i);
-                        if (area != null && area.containsKey("alias")) {
-                            String alias = (String) area.get("alias");
-                            if (alias != null && !alias.isEmpty()) {
+                        if (area != null && area.containsKey("name")) {
+                            String name = (String) area.get("name");
+                            if (name != null && !name.isEmpty()) {
                                 if (englishAddr.length() > 0) englishAddr.append(", ");
-                                englishAddr.append(alias);
+                                englishAddr.append(name);
                             }
                         }
                     }
@@ -358,12 +574,57 @@ public class PlaceSearchServiceImpl implements PlaceSearchService {
                     result.put("englishAddress", englishAddr.toString());
                 }
             }
-
         } catch (Exception e) {
-            log.warn("Failed to get Naver geocode: {}", e.getMessage());
+            log.warn("Failed to reverse geocode: {}", e.getMessage());
         }
 
         return result;
+    }
+
+    // addressElements에서 영문 주소 조합
+    private String buildEnglishAddress(Map<String, Object> addressData) {
+        StringBuilder englishAddr = new StringBuilder();
+
+        try {
+            if (addressData.containsKey("addressElements")) {
+                List<Map<String, Object>> elements = (List<Map<String, Object>>) addressData.get("addressElements");
+
+                // 역순으로 조합 (상세 → 광역)
+                List<String> parts = new ArrayList<>();
+
+                for (Map<String, Object> element : elements) {
+                    String longName = (String) element.get("longName");
+                    String shortName = (String) element.get("shortName");
+                    String code = (String) element.get("code");
+                    List<String> types = (List<String>) element.get("types");
+
+                    if (longName != null && !longName.isEmpty()) {
+                        // 영문이 있는 경우 우선 사용
+                        if (isEnglish(longName)) {
+                            parts.add(longName);
+                        } else if (shortName != null && isEnglish(shortName)) {
+                            parts.add(shortName);
+                        } else {
+                            // 한글인 경우 그대로 사용 (나중에 번역 가능)
+                            parts.add(longName);
+                        }
+                    }
+                }
+
+                // 역순으로 조합
+                Collections.reverse(parts);
+                englishAddr.append(String.join(", ", parts));
+            }
+        } catch (Exception e) {
+            log.warn("Failed to build English address from elements: {}", e.getMessage());
+        }
+
+        return englishAddr.toString();
+    }
+
+    // 영문 여부 확인
+    private boolean isEnglish(String text) {
+        return text != null && text.matches("^[a-zA-Z0-9\\s\\-,.]+$");
     }
 
     private void saveSearchHistory(String userId, String keyword, String translatedKeyword, PlaceDTO place) {
