@@ -140,6 +140,14 @@ jobs:
                   enabled: true
               url: https://api.openai.com/v1/chat/completions
               key: ${OPEN_AI_KEY}
+            naver:
+              map:
+                client-id: ${NAVER_MAP_CLIENT_ID}
+                client-secret: ${NAVER_MAP_CLIENT_SECRET}
+                geocode:
+                  url:
+            kakao:
+              api: ${KAKAO_API_KEY}
           jwt:
             secretKey: ${JWT_SECRET}
             expiration: 200000
