@@ -319,6 +319,7 @@ public class PlaceSearchServiceImpl implements PlaceSearchService {
                             fallback.put("category", info.get("category") != null ? info.get("category") : "");
                             fallbackList.add(fallback);
                         }
+
                         return fallbackList;
                     }
                 }

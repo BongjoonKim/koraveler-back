@@ -38,6 +38,9 @@ jobs:
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
           WEATHER_API_KEY: ${{ secrets.WEATHER_API_KEY }}
           OPEN_AI_KEY: ${{ secrets.OPEN_AI_KEY }}
+          NAVER_MAP_CLIENT_ID: ${{ secrets.NAVER_MAP_CLIENT_ID }}
+          NAVER_MAP_CLIENT_SECRET: ${{ secrets.NAVER_MAP_CLIENT_SECRET }}
+          KAKAO_API_KEY: ${{ secrets.KAKAO_API_KEY }}
         run: |
           # SSH 키 설정
           echo "$PRIVATE_KEY" > private_key.pem
