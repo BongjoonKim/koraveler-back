@@ -24,6 +24,8 @@ import server.koraveler.blog.service.BlogService;
 import server.koraveler.connections.bookmarks.repo.BookmarksRepo;
 import server.koraveler.users.model.Users;
 import server.koraveler.users.repo.UsersRepo;
+import org.bson.Document;  // 이 import 추가 필요!
+
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -44,6 +46,162 @@ public class BlogServiceImpl implements BlogService {
 
     @Autowired
     private BookmarksRepo bookmarksRepo;
+
+    private void testAggregationSteps(
+            AggregationOperation matchDraft,
+            AggregationOperation lookupBookmarks,
+            AggregationOperation matchUserBookmarks,
+            String userId) {
+
+        // Step 1: matchDraft 테스트
+        Aggregation test1 = Aggregation.newAggregation(matchDraft);
+        List<Documents> step1Results = mongoTemplate.aggregate(
+                test1, "documents", Documents.class
+        ).getMappedResults();
+        System.out.println("Step 1 - After matchDraft: " + step1Results.size() + " documents");
+
+        // Step 2: lookup 테스트 - org.bson.Document 사용!
+        Aggregation test2 = Aggregation.newAggregation(matchDraft, lookupBookmarks);
+        List<Document> step2Results = mongoTemplate.aggregate(
+                test2, "documents", Document.class  // org.bson.Document 사용
+        ).getMappedResults();
+
+        System.out.println("Step 2 - After lookup: " + step2Results.size() + " documents");
+
+        // bookmarks 배열 확인
+        for (Document doc : step2Results) {  // Document는 org.bson.Document
+            List<Document> bookmarks = (List<Document>) doc.get("bookmarks");
+            if (bookmarks != null && !bookmarks.isEmpty()) {
+                System.out.println("  문서 ID: " + doc.get("_id"));
+                System.out.println("  bookmarks 개수: " + bookmarks.size());
+
+                // 각 bookmark 내용 출력
+                for (Document bookmark : bookmarks) {
+                    System.out.println("    - userId: " + bookmark.get("userId") +
+                            ", isBookmarked: " + bookmark.get("isBookmarked") +
+                            ", documentId: " + bookmark.get("documentId"));
+                }
+            }
+        }
+
+        // 현재 사용자의 북마크가 있는지 확인
+        long userBookmarkCount = step2Results.stream()
+                .filter(doc -> {
+                    List<Document> bookmarks = (List<Document>) doc.get("bookmarks");
+                    if (bookmarks == null) return false;
+                    return bookmarks.stream().anyMatch(b ->
+                            userId.equals(b.get("userId")) &&
+                                    Boolean.TRUE.equals(b.get("isBookmarked"))
+                    );
+                })
+                .count();
+
+        System.out.println("Step 2.5 - 현재 사용자(" + userId + ")의 북마크가 있는 문서 수: " + userBookmarkCount);
+
+        // Step 3: matchUserBookmarks 테스트
+        Aggregation test3 = Aggregation.newAggregation(
+                matchDraft,
+                lookupBookmarks,
+                matchUserBookmarks
+        );
+        List<Documents> step3Results = mongoTemplate.aggregate(
+                test3, "documents", Documents.class  // 여기는 Documents 클래스 사용 가능
+        ).getMappedResults();
+
+        System.out.println("Step 3 - After user filter: " + step3Results.size() + " documents");
+
+        if (step3Results.isEmpty() && userBookmarkCount > 0) {
+            System.out.println("⚠️ 경고: lookup 후에는 사용자 북마크가 있었지만, elemMatch 필터 후 결과가 없습니다!");
+            System.out.println("=== 대체 방법 테스트 ===");
+
+            // 대체 방법 1: unwind 사용
+            testUnwindMethod(matchDraft, lookupBookmarks, userId);
+        }
+    }
+
+    // 대체 방법 테스트 메서드도 추가
+    private void testUnwindMethod(
+            AggregationOperation matchDraft,
+            AggregationOperation lookupBookmarks,
+            String userId) {
+
+        System.out.println("=== Unwind 방법 테스트 ===");
+
+        AggregationOperation unwind = Aggregation.unwind("bookmarks", false);
+        AggregationOperation matchDirect = Aggregation.match(
+                Criteria.where("bookmarks.userId").is(userId)
+                        .and("bookmarks.isBookmarked").is(true)
+        );
+
+        Aggregation unwindAgg = Aggregation.newAggregation(
+                matchDraft,
+                lookupBookmarks,
+                unwind,
+                matchDirect
+        );
+
+        List<Documents> unwindResults = mongoTemplate.aggregate(
+                unwindAgg, "documents", Documents.class
+        ).getMappedResults();
+
+        System.out.println("Unwind 방법 결과: " + unwindResults.size() + " documents");
+
+        if (!unwindResults.isEmpty()) {
+            System.out.println("✅ Unwind 방법이 작동합니다! elemMatch 대신 이 방법을 사용하세요.");
+        }
+    }
+
+    private void testAggregationStepsWithAddFields(
+            AggregationOperation matchDraft,
+            AggregationOperation addFields,
+            AggregationOperation lookupBookmarks,
+            AggregationOperation matchUserBookmarks,
+            String userId) {
+
+        // Step 1: matchDraft 테스트
+        Aggregation test1 = Aggregation.newAggregation(matchDraft);
+        List<Documents> step1Results = mongoTemplate.aggregate(
+                test1, "documents", Documents.class
+        ).getMappedResults();
+        System.out.println("Step 1 - After matchDraft: " + step1Results.size() + " documents");
+
+        // Step 2: addFields 테스트
+        Aggregation test2 = Aggregation.newAggregation(matchDraft, addFields, lookupBookmarks);
+        List<Document> step2Results = mongoTemplate.aggregate(
+                test2, "documents", Document.class
+        ).getMappedResults();
+
+        System.out.println("Step 2 - After addFields and lookup: " + step2Results.size() + " documents");
+
+        // bookmarks 배열 확인
+        for (Document doc : step2Results) {
+            List<Document> bookmarks = (List<Document>) doc.get("bookmarks");
+            if (bookmarks != null && !bookmarks.isEmpty()) {
+                System.out.println("  문서 ID: " + doc.get("_id"));
+                System.out.println("  문서 _idStr: " + doc.get("_idStr"));  // 변환된 string ID 확인
+                System.out.println("  bookmarks 개수: " + bookmarks.size());
+
+                for (Document bookmark : bookmarks) {
+                    System.out.println("    - userId: " + bookmark.get("userId") +
+                            ", isBookmarked: " + bookmark.get("isBookmarked") +
+                            ", documentId: " + bookmark.get("documentId"));
+                }
+            }
+        }
+
+        // Step 3: 최종 필터링
+        Aggregation test3 = Aggregation.newAggregation(
+                matchDraft,
+                addFields,
+                lookupBookmarks,
+                matchUserBookmarks
+        );
+        List<Documents> step3Results = mongoTemplate.aggregate(
+                test3, "documents", Documents.class
+        ).getMappedResults();
+
+        System.out.println("Step 3 - After user filter: " + step3Results.size() + " documents");
+    }
 
     @Override
     public DocumentsDTO createDocument(DocumentsDTO documentsDTO) {
@@ -132,56 +290,81 @@ public class BlogServiceImpl implements BlogService {
                             if (BlogConstants.BlogPageType.MY_BLOG.getValue().equals(pageDTO.getPageType())) {
                                 documents = this.findByCreatedUserOrUpdatedUserAndDraft(users.getUserId(), users.getUserId(), pageable, false);
                             } else if (BlogConstants.BlogPageType.BOOKMARK.getValue().equals(pageDTO.getPageType())) {
-                                // 1. documents 컬렉션에서 createdUser 또는 updatedUser가 userId인 문서 찾기
-                                AggregationOperation matchDocuments = Aggregation.match(
-                                        new Criteria().orOperator(
-                                                Criteria.where("createdUser").is(users.getUserId()),
-                                                Criteria.where("updatedUser").is(users.getUserId())
-                                        ).and("draft").is(false)
+                                // 디버깅 모드
+                                boolean debugMode = false; // 배포 시 false로 변경
+
+                                if (debugMode) {
+                                    System.out.println("=== BOOKMARK 조회 시작 ===");
+                                    System.out.println("User ID: " + users.getUserId());
+                                }
+
+                                // 1. Draft 필터
+                                AggregationOperation matchDraft = Aggregation.match(
+                                        Criteria.where("draft").ne(true)
                                 );
 
-                                // 2. con_bookmarks_users_documents 컬렉션에서 userId가 userId인 문서 찾기
+                                // 2. Lookup - 이제 타입 변환 없이 직접 사용 가능
                                 AggregationOperation lookupBookmarks = Aggregation.lookup(
-                                        "con_bookmarks_users_documents",   // 외부 컬렉션 이름
-                                        "_id",                             // documents 컬렉션의 _id
-                                        "documentId",                      // con_bookmarks_users_documents의 documentId
-                                        "bookmarks"                        // 결과를 저장할 필드 이름
+                                        "con_bookmarks_users_documents",
+                                        "_id",  // ObjectId 타입 그대로 사용
+                                        "documentId",  // Bookmark의 documentId도 ObjectId 타입
+                                        "bookmarks"
                                 );
 
-                                // 3. bookmark가 userId와 일치하는 필드만 필터링
-                                AggregationOperation matchBookmarks = Aggregation.match(
-                                        Criteria.where("bookmarks.userId").is(users.getUserId())
+                                // 3. Match bookmarks - 현재 사용자가 북마크한 문서만 필터
+                                AggregationOperation matchUserBookmarks = Aggregation.match(
+                                        Criteria.where("bookmarks").elemMatch(
+                                                Criteria.where("userId").is(users.getUserId())
+                                                        .and("isBookmarked").is(true)
+                                        )
                                 );
 
-                                // 4. Aggregation 조합
+                                // 4. Sort, Skip, Limit
+                                AggregationOperation sortOperation = Aggregation.sort(sort);
+                                AggregationOperation skipOperation = Aggregation.skip(
+                                        (long) pageable.getPageNumber() * pageable.getPageSize()
+                                );
+                                AggregationOperation limitOperation = Aggregation.limit(pageable.getPageSize());
+
+                                // 5. 전체 aggregation (addFields 제거)
                                 Aggregation aggregation = Aggregation.newAggregation(
-                                        matchDocuments,
+                                        matchDraft,
                                         lookupBookmarks,
-                                        matchBookmarks
+                                        matchUserBookmarks,
+                                        sortOperation,
+                                        skipOperation,
+                                        limitOperation
                                 );
 
-                                // 5. 결과 실행 및 반환
+                                // 6. Count aggregation (addFields 제거)
+                                Aggregation countAggregation = Aggregation.newAggregation(
+                                        matchDraft,
+                                        lookupBookmarks,
+                                        matchUserBookmarks,
+                                        Aggregation.count().as("total")
+                                );
+
+                                // 7. 실행
                                 AggregationResults<Documents> results = mongoTemplate.aggregate(
                                         aggregation, "documents", Documents.class
                                 );
 
+                                if (debugMode) {
+                                    System.out.println("최종 결과 개수: " + results.getMappedResults().size());
+                                }
 
-                                Aggregation countAggregation = Aggregation.newAggregation(
-                                        matchDocuments,
-                                        lookupBookmarks,
-                                        matchBookmarks,
-                                        Aggregation.count().as("total")
-                                );
+                                // 8. 카운트 수행
+                                CountResult countResult = mongoTemplate.aggregate(
+                                        countAggregation, "documents", CountResult.class
+                                ).getUniqueMappedResult();
 
-                                // 7. 카운트 수행
-                                long totalCount = mongoTemplate.aggregate(countAggregation, "documents", CountResult.class)
-                                        .getUniqueMappedResult() != null ? mongoTemplate.aggregate(countAggregation, "documents", CountResult.class)
-                                        .getUniqueMappedResult().getTotal() : 0;
+                                long totalCount = countResult != null ? countResult.getTotal() : 0;
 
                                 documents = PageableExecutionUtils.getPage(
                                         results.getMappedResults(),
                                         pageable,
-                                        () -> totalCount);
+                                        () -> totalCount
+                                );
                             } else if (BlogConstants.BlogPageType.DRAFT.getValue().equals(pageDTO.getPageType())) {
                                 documents = this.findByCreatedUserOrUpdatedUserAndDraft(users.getUserId(), users.getUserId(), pageable, true);
                             }
