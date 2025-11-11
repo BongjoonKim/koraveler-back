@@ -1,5 +1,6 @@
 package server.koraveler.blog.service.BlogServiceImpl;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
@@ -14,6 +15,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 import org.springframework.util.ObjectUtils;
+import org.springframework.util.StringUtils;
 import server.koraveler.blog.constants.BlogConstants;
 import server.koraveler.blog.dto.DocumentsDTO;
 import server.koraveler.blog.dto.DocumentsInfo;
@@ -33,6 +35,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 @Service
+@Slf4j
 public class BlogServiceImpl implements BlogService {
 
     @Autowired
@@ -490,21 +493,205 @@ public class BlogServiceImpl implements BlogService {
         return new PageImpl<>(entities, pageable, total);
     };
 
-//    @Override
-//    public DocumentsInfo.DocumentsDTO searchDocuments(String value) {
-//        org.springframework.data.elasticsearch.core.query.Criteria criteria = new org.springframework.data.elasticsearch.core.query.Criteria("title").contains(value)
-//                .or("contents").contains(value);
-//
-//        CriteriaQuery query = new CriteriaQuery(criteria);
-//
-//        org.springframework.data.elasticsearch.core.SearchHits<Documents> searchHits = elasticsearchTemplate.search(query, Documents.class);
-//        List<Documents> documents = searchHits.stream().map(hit -> hit.getContent()).collect(Collectors.toList());
-//
-//        DocumentsInfo.DocumentsDTO newDocument = new DocumentsInfo.DocumentsDTO();
-//        BeanUtils.copyProperties(documents, newDocument);
-//
-//        return newDocument;
-//    }
+    @Override
+    public DocumentsDTO setAsFeatured(String id, Documents.FeaturedInfo featuredInfo,
+                                      LocalDateTime startDate, LocalDateTime endDate,
+                                      String approvedBy) {
+        try {
+            Documents document = blogsRepo.findById(id)
+                    .orElseThrow(() -> new RuntimeException("문서를 찾을 수 없습니다"));
+
+            // Draft 상태인 글은 Featured로 설정 불가
+            if (document.isDraft()) {
+                throw new RuntimeException("임시저장 상태의 글은 Featured로 설정할 수 없습니다");
+            }
+
+            // 동일 기간에 이미 활성화된 Featured 확인
+            List<Documents> conflictingDocs = blogsRepo
+                    .findFeaturedDocumentsByDateRange(startDate, endDate);
+
+            if (!conflictingDocs.isEmpty() && !conflictingDocs.get(0).getId().equals(id)) {
+                throw new RuntimeException("해당 기간에 이미 Featured 글이 존재합니다");
+            }
+
+            // Featured 정보 설정
+            if (featuredInfo == null) {
+                // 기본 Featured 정보 생성
+                featuredInfo = Documents.FeaturedInfo.builder()
+                        .featuredTitle(document.getTitle())
+                        .featuredSubtitle("Explore Korea with Koraveler")
+                        .featuredImageUrl(document.getThumbnailImgUrl())
+                        .displayPriority(1)
+                        .build();
+            }
+
+            // Featured 스케줄 설정
+            Documents.FeaturedSchedule schedule = Documents.FeaturedSchedule.builder()
+                    .startDate(startDate)
+                    .endDate(endDate)
+                    .isActive(true)
+                    .approvedBy(approvedBy)
+                    .approvedAt(LocalDateTime.now())
+                    .build();
+
+            document.setFeaturedReady(true);
+            document.setFeaturedInfo(featuredInfo);
+            document.setFeaturedSchedule(schedule);
+            document.setUpdated(LocalDateTime.now());
+            document.setUpdatedUser(approvedBy);
+
+            Documents savedDocument = blogsRepo.save(document);
+
+            DocumentsDTO resultDTO = new DocumentsDTO();
+            BeanUtils.copyProperties(savedDocument, resultDTO);
+
+            log.info("문서를 Featured로 설정: {} (기간: {} ~ {})", id, startDate, endDate);
+            return resultDTO;
+
+        } catch (Exception e) {
+            log.error("Featured 설정 실패: {}", id, e);
+            throw new RuntimeException("Featured 설정 실패: " + e.getMessage(), e);
+        }
+    }
+
+    @Override
+    public DocumentsDTO removeFromFeatured(String id) {
+        try {
+            Documents document = blogsRepo.findById(id)
+                    .orElseThrow(() -> new RuntimeException("문서를 찾을 수 없습니다"));
+
+            // Featured 관련 정보 모두 제거
+            document.setFeaturedReady(false);
+            document.setFeaturedInfo(null);
+            document.setFeaturedSchedule(null);
+            document.setUpdated(LocalDateTime.now());
+
+            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+            if (auth != null) {
+                document.setUpdatedUser(auth.getName());
+            }
+
+            Documents savedDocument = blogsRepo.save(document);
+
+            DocumentsDTO resultDTO = new DocumentsDTO();
+            BeanUtils.copyProperties(savedDocument, resultDTO);
+
+            log.info("Featured 설정 해제: {}", id);
+            return resultDTO;
+
+        } catch (Exception e) {
+            log.error("Featured 해제 실패: {}", id, e);
+            throw new RuntimeException("Featured 해제 실패: " + e.getMessage(), e);
+        }
+    }
+
+    @Override
+    public DocumentsDTO updateFeaturedInfo(String id, Documents.FeaturedInfo featuredInfo) {
+        try {
+            Documents document = blogsRepo.findById(id)
+                    .orElseThrow(() -> new RuntimeException("문서를 찾을 수 없습니다"));
+
+            if (!document.isFeaturedReady()) {
+                throw new RuntimeException("Featured로 설정되지 않은 문서입니다");
+            }
+
+            document.setFeaturedInfo(featuredInfo);
+            document.setUpdated(LocalDateTime.now());
+
+            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+            if (auth != null) {
+                document.setUpdatedUser(auth.getName());
+            }
+
+            Documents savedDocument = blogsRepo.save(document);
+
+            DocumentsDTO resultDTO = new DocumentsDTO();
+            BeanUtils.copyProperties(savedDocument, resultDTO);
+
+            log.info("Featured 정보 수정: {}", id);
+            return resultDTO;
+
+        } catch (Exception e) {
+            log.error("Featured 정보 수정 실패: {}", id, e);
+            throw new RuntimeException("Featured 정보 수정 실패: " + e.getMessage(), e);
+        }
+    }
+
+    @Override
+    public List<DocumentsDTO> getActiveFeaturedDocuments(int limit) {
+        LocalDateTime now = LocalDateTime.now();
+
+        // 우선순위 순으로 정렬하여 활성화된 Featured 문서 조회
+        Sort sort = Sort.by(Sort.Direction.ASC, "featuredInfo.displayPriority");
+        List<Documents> activeDocs = blogsRepo
+                .findActiveFeaturedDocumentsOrderByPriority(now, sort);
+
+        // limit 적용
+        return activeDocs.stream()
+                .limit(limit)
+                .map(doc -> {
+                    DocumentsDTO dto = new DocumentsDTO();
+                    BeanUtils.copyProperties(doc, dto);
+                    return dto;
+                })
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public DocumentsInfo getFeaturableDocuments(int page, int size, String search) {
+        Pageable pageable = PageRequest.of(page, size,
+                Sort.by(Sort.Direction.DESC, "updated"));
+
+        Page<Documents> documents;
+
+        if (StringUtils.hasText(search)) {
+            // 검색어가 있으면 제목/내용에서 검색
+            documents = blogsRepo.findByDraftFalseAndFeaturedReadyFalseAndTitleContainingOrContentsContaining(
+                    search, search, pageable);
+        } else {
+            // Featured가 아니고 draft가 아닌 모든 글
+            documents = blogsRepo.findByDraftFalseAndFeaturedReadyFalse(pageable);
+        }
+
+        List<DocumentsDTO> dtoList = documents.getContent().stream()
+                .map(doc -> {
+                    DocumentsDTO dto = new DocumentsDTO();
+                    BeanUtils.copyProperties(doc, dto);
+                    return dto;
+                })
+                .collect(Collectors.toList());
+
+        DocumentsInfo info = new DocumentsInfo();
+        info.setDocuments(dtoList);
+        info.setTotalDocsCnt(documents.getTotalElements());
+        info.setTotalPagesCnt(documents.getTotalPages());
+
+        return info;
+    }
+
+    @Override
+    public DocumentsInfo getFeaturedHistory(int page, int size) {
+        Pageable pageable = PageRequest.of(page, size,
+                Sort.by(Sort.Direction.DESC, "featuredSchedule.approvedAt"));
+
+        // Featured로 설정된 적이 있는 모든 문서 (활성/비활성 포함)
+        Page<Documents> featuredDocs = blogsRepo.findByFeaturedReadyTrue(pageable);
+
+        List<DocumentsDTO> dtoList = featuredDocs.getContent().stream()
+                .map(doc -> {
+                    DocumentsDTO dto = new DocumentsDTO();
+                    BeanUtils.copyProperties(doc, dto);
+                    return dto;
+                })
+                .collect(Collectors.toList());
+
+        DocumentsInfo info = new DocumentsInfo();
+        info.setDocuments(dtoList);
+        info.setTotalDocsCnt(featuredDocs.getTotalElements());
+        info.setTotalPagesCnt(featuredDocs.getTotalPages());
+
+        return info;
+    }
 }
 
 
