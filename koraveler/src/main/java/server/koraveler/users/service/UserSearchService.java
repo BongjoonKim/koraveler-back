@@ -1,6 +1,6 @@
-// UserSearchService.java
 package server.koraveler.users.service;
 
+import server.koraveler.users.dto.CustomUserDetails;
 import server.koraveler.users.dto.response.UserResponse;
 import server.koraveler.users.dto.response.UserSearchResponse;
 
@@ -49,4 +49,11 @@ public interface UserSearchService {
      * @return 사용자 목록
      */
     UserSearchResponse getUsers(Integer page, Integer size, String sortBy, String sortDirection);
+
+    /**
+     * 현재 로그인한 사용자 정보를 권한과 함께 조회
+     * @param userDetails 인증된 사용자 정보
+     * @return 권한 정보를 포함한 사용자 정보
+     */
+    UserResponse getCurrentUserWithRoles(CustomUserDetails userDetails);
 }

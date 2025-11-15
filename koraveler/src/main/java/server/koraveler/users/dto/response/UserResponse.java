@@ -8,6 +8,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 @AllArgsConstructor
@@ -20,5 +21,7 @@ public class UserResponse {
     private String email;        // 이메일
     private String profileImage; // 프로필 이미지 URL
     private String status;       // ACTIVE, INACTIVE
+    private List<String> roles;       // 권한 역할 (추가)
+    private List<String> authorities; // 권한 목록 (추가)
     private LocalDateTime createdAt;
 }
