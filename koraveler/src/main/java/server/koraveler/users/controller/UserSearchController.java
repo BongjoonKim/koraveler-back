@@ -3,6 +3,7 @@ package server.koraveler.users.controller;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
@@ -93,14 +94,23 @@ public class UserSearchController {
 
     /**
      * 현재 로그인한 사용자 정보
+     * 프론트엔드에서 currentUser 확인용
+     * roles와 authorities 정보 포함하여 반환
      */
     @GetMapping("/me")
     public ResponseEntity<UserResponse> getCurrentUser(
             @AuthenticationPrincipal CustomUserDetails userDetails) {
 
+        // 인증되지 않은 경우
+        if (userDetails == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+
         log.info("Getting current user info: {}", userDetails.getUsername());
 
-        UserResponse response = userSearchService.getUserById(userDetails.getUsername());
+        // 기존: UserResponse response = userSearchService.getUserById(userDetails.getUsername());
+        // 수정: 권한 정보를 포함한 메서드 호출
+        UserResponse response = userSearchService.getCurrentUserWithRoles(userDetails);
 
         return ResponseEntity.ok(response);
     }

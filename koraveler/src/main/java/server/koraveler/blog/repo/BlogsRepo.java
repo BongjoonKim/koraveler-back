@@ -8,12 +8,12 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.mongodb.core.MongoTemplate;
-import org.springframework.data.mongodb.core.query.Criteria;
-import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.data.mongodb.repository.Query;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.stereotype.Repository;
 import server.koraveler.blog.model.Documents;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Repository
@@ -23,4 +23,38 @@ public interface BlogsRepo extends MongoRepository<Documents, String> {
 
     Page<Documents> findAllByDraftIsFalseOrDraftIsNull(Pageable pageable);
     Page<Documents> findAllByTitleContainingIgnoreCaseOrContentsContainingIgnoreCase(String titleValue, String contentsValue, Pageable pageable);
+
+    // Featured Ready인 문서들 조회
+    Page<Documents> findByFeaturedReadyTrueAndDraftFalse(Pageable pageable);
+
+    // 현재 활성화된 Featured 문서 조회
+    @Query("{ 'featuredSchedule.isActive': true, " +
+            "'featuredSchedule.startDate': { $lte: ?0 }, " +
+            "'featuredSchedule.endDate': { $gte: ?0 }, " +
+            "'draft': false }")
+    List<Documents> findActiveFeaturedDocuments(LocalDateTime currentDate);
+
+    // 특정 기간의 Featured 문서 조회
+    @Query("{ 'featuredSchedule.startDate': { $gte: ?0, $lte: ?1 }, " +
+            "'featuredSchedule.isActive': true }")
+    List<Documents> findFeaturedDocumentsByDateRange(
+            LocalDateTime startDate, LocalDateTime endDate);
+
+    // 우선순위별 Featured 문서 조회
+    @Query("{ 'featuredSchedule.isActive': true, " +
+            "'featuredSchedule.startDate': { $lte: ?0 }, " +
+            "'featuredSchedule.endDate': { $gte: ?0 } }")
+    List<Documents> findActiveFeaturedDocumentsOrderByPriority(
+            LocalDateTime currentDate,
+            org.springframework.data.domain.Sort sort);
+
+    // Featured가 아닌 일반 글 조회
+    Page<Documents> findByDraftFalseAndFeaturedReadyFalse(Pageable pageable);
+
+    // Featured가 아닌 일반 글 검색
+    Page<Documents> findByDraftFalseAndFeaturedReadyFalseAndTitleContainingOrContentsContaining(
+            String title, String contents, Pageable pageable);
+
+    // Featured 설정된 모든 글 (히스토리용)
+    Page<Documents> findByFeaturedReadyTrue(Pageable pageable);
 }

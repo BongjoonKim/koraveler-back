@@ -8,12 +8,14 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import server.koraveler.chat.model.entities.ChannelMembers;
 import server.koraveler.chat.model.enums.MemberStatus;
 import server.koraveler.chat.repository.ChannelMembersRepo;
 import server.koraveler.error.CustomException;
+import server.koraveler.users.dto.CustomUserDetails;
 import server.koraveler.users.dto.response.UserResponse;
 import server.koraveler.users.dto.response.UserSearchResponse;
 import server.koraveler.users.model.Users;
@@ -224,6 +226,32 @@ public class UserSearchServiceImpl implements UserSearchService {
                 .email(user.getEmail())
                 .profileImage(user.getSrc())
                 .status(user.isEnabled() ? "ACTIVE" : "INACTIVE")
+                .createdAt(user.getCreated())
+                .build();
+    }
+
+    /**
+     * 현재 로그인한 사용자 정보를 권한과 함께 조회
+     * UserSearchController의 /me 엔드포인트에서 사용
+     */
+    @Override
+    public UserResponse getCurrentUserWithRoles(CustomUserDetails userDetails) {
+        log.info("Getting current user with roles: {}", userDetails.getUsername());
+
+        Users user = userDetails.getUsers();
+
+        // 권한 정보를 포함한 응답 생성
+        return UserResponse.builder()
+                .id(user.getId())
+                .userId(user.getUserId())
+                .name(user.getName())
+                .email(user.getEmail())
+                .profileImage(user.getSrc())
+                .status(user.isEnabled() ? "ACTIVE" : "INACTIVE")
+                .roles(user.getRoles())  // roles 정보 포함
+                .authorities(user.getAuthorities().stream()
+                        .map(GrantedAuthority::getAuthority)
+                        .collect(Collectors.toList()))  // authorities 정보 포함
                 .createdAt(user.getCreated())
                 .build();
     }
