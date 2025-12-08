@@ -124,7 +124,7 @@ public class MessageServiceImpl implements MessageService {
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public MessageListResponse getChannelMessages(String channelId, server.koraveler.chat.dto.request.PageRequest pageRequest, String userId) {
         log.info("Getting messages for channel: {} by user: {}", channelId, userId);
 
@@ -149,12 +149,31 @@ public class MessageServiceImpl implements MessageService {
                 })
                 .toList();
 
+        // 해당 채널에 접속해서 메세지를 확인한 것이므로 lastSeenAt을 최신화
+        updateLastSeenAt(channelId, userId);
+
         return MessageListResponse.builder()
                 .messages(messageResponses)
                 .hasNext(messagePage.hasNext())
                 .nextCursor(null)
                 .totalCount((int) messagePage.getTotalElements())
                 .build();
+    }
+
+    private void updateLastSeenAt(String channelId, String userId) {
+        try {
+            ChannelMembers members = channelMembersRepo.findByChannelIdAndUserId(channelId, userId).orElse(null);
+
+            if (members != null) {
+                members.setLastSeenAt(LocalDateTime.now());
+                channelMembersRepo.save(members);
+                log.debug("Updated lastSeenAt for user {} in channel {}", userId, channelId);
+            }
+        } catch (Exception e) {
+            // lastSeenAt 업데이트 실패가 메시지 조회 전체를 실패시키지 않도록 예외 처리
+            log.warn("Failed to update lastSeenAt for user {} in channel {}: {}",
+                    userId, channelId, e.getMessage());
+        }
     }
 
     @Override
