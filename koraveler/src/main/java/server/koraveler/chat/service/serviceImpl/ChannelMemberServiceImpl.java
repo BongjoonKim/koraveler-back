@@ -23,6 +23,8 @@ import server.koraveler.error.CustomException;
 import server.koraveler.error.ErrorCode;
 
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -284,6 +286,7 @@ public class ChannelMemberServiceImpl implements ChannelMemberService {
     public List<ChannelMemberResponse> getOnlineMembers(String channelId, String userId) {
         validateChannelMembership(channelId, userId);
 
+        // 본초 자오선 기준 최근 접속 확인
         LocalDateTime onlineThreshold = LocalDateTime.now().minusMinutes(5);
 
         List<ChannelMembers> onlineMembers = channelMembersRepo
@@ -327,6 +330,19 @@ public class ChannelMemberServiceImpl implements ChannelMemberService {
     }
 
     private ChannelMemberResponse toChannelMemberResponse(ChannelMembers member) {
+        ChannelAuthorities authorities = channelAuthoritiesRepo.findByChannelIdAndUserId(
+                member.getChannelId(), member.getUserId()
+        );
+        String roleId = null;
+
+        if (authorities != null) {
+            roleId = authorities.getRoleId();
+        }
+
+        boolean isOnline = member.getLastSeenAt() != null &&
+                member.getLastSeenAt().isAfter(LocalDateTime.now().minusMinutes(1));
+
+
         return ChannelMemberResponse.builder()
                 .id(member.getId())
                 .userId(member.getUserId())
@@ -338,6 +354,8 @@ public class ChannelMemberServiceImpl implements ChannelMemberService {
                 .notificationLevel(member.getNotificationLevel())
                 .isMuted(member.getIsMuted())
                 .mutedUntil(member.getMutedUntil())
+                .isOnline(isOnline)
+                .roleId(roleId)
                 // 추가 정보는 별도 조회 후 설정
                 .build();
     }
