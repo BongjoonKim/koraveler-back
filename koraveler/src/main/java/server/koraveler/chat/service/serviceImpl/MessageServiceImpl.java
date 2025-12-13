@@ -1,5 +1,6 @@
 package server.koraveler.chat.service.serviceImpl;
 
+import kotlin.collections.ArrayDeque;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -21,8 +22,12 @@ import server.koraveler.error.CustomException;
 import server.koraveler.error.ErrorCode;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+
+import static com.fasterxml.jackson.databind.type.LogicalType.Collection;
 
 @Slf4j
 @Service
@@ -130,18 +135,37 @@ public class MessageServiceImpl implements MessageService {
 
         validateChannelAccess(channelId, userId);
 
-        Pageable pageable = PageRequest.of(
-                pageRequest.getPage() != null ? pageRequest.getPage() : 0,
-                pageRequest.getSize() != null ? pageRequest.getSize() : 50
-        );
+        int size = pageRequest.getSize() != null ? pageRequest.getSize() : 30;
 
-        Page<Messages> messagePage = messagesRepo.findByChannelIdAndIsDeletedFalseOrderByCreatedAtAsc(
-                channelId,
-                pageable
-        );
+        // 한 개 더 조회해서 hasMore 판단
+        Pageable pageable = PageRequest.of(0, size + 1);
+
+        List<Messages> fetchedMessages;
+
+        if (pageRequest.getCursor() != null && !pageRequest.getCursor().isEmpty()) {
+            LocalDateTime cursorTime = LocalDateTime.parse(pageRequest.getCursor());
+            fetchedMessages = messagesRepo.findByChannelIdAndIsDeletedFalseAndCreatedAtBeforeOrderByCreatedAtDesc(
+                    channelId,
+                    cursorTime,
+                    pageable
+            ).getContent();
+        } else {
+            fetchedMessages = messagesRepo.findByChannelIdAndIsDeletedFalseOrderByCreatedAtDesc(
+                   channelId,
+                   pageable
+            ).getContent();
+        }
+
+        boolean hasMore = fetchedMessages.size() > size;
+
+        List<Messages> messages = hasMore
+                ? new ArrayList<>(fetchedMessages.subList(0, size))
+                : new ArrayList<>(fetchedMessages);
+
+        Collections.reverse(messages);
 
         // ✅ 수정: isMyMessage 설정 추가
-        List<MessageResponse> messageResponses = messagePage.getContent().stream()
+        List<MessageResponse> messageResponses = messages.stream()
                 .map(message -> {
                     MessageResponse response = messageMapper.toResponse(message);
                     response.setIsMyMessage(message.getUserId().equals(userId)); // 현재 사용자와 비교
@@ -149,14 +173,18 @@ public class MessageServiceImpl implements MessageService {
                 })
                 .toList();
 
+        String cursor = null;
+        if (!messages.isEmpty()) {
+            cursor = messages.get(0).getCreatedAt().toString();
+        }
+
         // 해당 채널에 접속해서 메세지를 확인한 것이므로 lastSeenAt을 최신화
         updateLastSeenAt(channelId, userId);
 
         return MessageListResponse.builder()
                 .messages(messageResponses)
-                .hasNext(messagePage.hasNext())
-                .nextCursor(null)
-                .totalCount((int) messagePage.getTotalElements())
+                .hasMore(hasMore)
+                .cursor(cursor)
                 .build();
     }
 
@@ -209,8 +237,8 @@ public class MessageServiceImpl implements MessageService {
 
         return MessageListResponse.builder()
                 .messages(messageResponses)
-                .hasNext(messagePage.hasNext())
-                .nextCursor(null)
+                .hasMore(messagePage.hasNext())
+                .cursor(null)
                 .totalCount((int) messagePage.getTotalElements())
                 .build();
     }
@@ -318,7 +346,7 @@ public class MessageServiceImpl implements MessageService {
 
         return MessageListResponse.builder()
                 .messages(replyResponses)
-                .hasNext(repliesPage.hasNext())
+                .hasMore(repliesPage.hasNext())
                 .totalCount((int) repliesPage.getTotalElements())
                 .build();
     }
@@ -345,7 +373,7 @@ public class MessageServiceImpl implements MessageService {
 
         return MessageListResponse.builder()
                 .messages(messageResponses)
-                .hasNext(mentionedPage.hasNext())
+                .hasMore(mentionedPage.hasNext())
                 .totalCount((int) mentionedPage.getTotalElements())
                 .build();
     }

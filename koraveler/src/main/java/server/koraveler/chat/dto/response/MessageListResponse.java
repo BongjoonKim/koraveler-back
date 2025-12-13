@@ -14,7 +14,7 @@ import java.util.List;
 @Builder
 public class MessageListResponse {
     private List<MessageResponse> messages;
-    private Boolean hasNext; // 다음 페이지 존재 여부
-    private String nextCursor; // 다음 페이지 커서
+    private Boolean hasMore; // 다음 페이지 존재 여부
+    private String cursor; // 다음 페이지 커서
     private Integer totalCount; // 전체 메시지 수
 }
