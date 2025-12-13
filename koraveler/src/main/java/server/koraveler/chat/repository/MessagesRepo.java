@@ -23,6 +23,25 @@ public interface MessagesRepo extends MongoRepository<Messages, String> {
             Pageable pageable
     );
 
+    Page<Messages> findByChannelIdAndIsDeletedFalseOrderByCreatedAtDesc(
+        String channelId,
+        Pageable pageable
+    );
+
+    // 커서 이전 메시지 조회 (스크롤 업 - 이전 메시지 로드)
+    Page<Messages> findByChannelIdAndIsDeletedFalseAndCreatedAtBeforeOrderByCreatedAtDesc(
+            String channelId,
+            LocalDateTime cursor,
+            Pageable pageable
+    );
+
+    // 커서 이후 메시지 조회 (새 메시지 로드용)
+    Page<Messages> findByChannelIdAndIsDeletedFalseAndCreatedAtAfterOrderByCreatedAtAsc(
+            String channelId,
+            LocalDateTime cursor,
+            Pageable pageable
+    );
+
     // 채널별 메시지 검색 (키워드 포함, 페이징)
     Page<Messages> findByChannelIdAndIsDeletedFalseAndMessageContainingIgnoreCaseOrderByCreatedAtDesc(
             String channelId,
