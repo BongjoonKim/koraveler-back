@@ -669,6 +669,31 @@ public class ChannelServiceImpl implements ChannelService {
         ChannelMembers member = channelMembersRepo.findByChannelIdAndUserId(channelId, userId)
                 .orElseThrow(() -> new CustomException(ErrorCode.NOT_CHANNEL_MEMBER));
 
+        // 채널 오너인 경우 추가 검증 필요
+        ChannelAuthorities authority = channelAuthoritiesRepo.findByChannelIdAndUserId(channelId, userId);
+        if (authority != null && "OWNER".equals(authority.getRoleId())) {
+            Long actualMemberCount = channelMembersRepo.countActiveMembers(channelId);
+
+            if (actualMemberCount > 0) {
+                // 다른 오너가 있는지 확인
+                List<ChannelAuthorities> otherOwners = channelAuthoritiesRepo
+                        .findByChannelIdAndRoleId(channelId, "OWNER")
+                        .stream()
+                        .filter(auth -> !auth.getUserId().equals(userId))
+                        .toList();
+
+                if (otherOwners.size() > 0) {
+                    throw new CustomException(ErrorCode.OWNER_MUST_TRANSFER_ROLE,
+                            "Please delegate yout OWNER role");
+                }
+            } else {
+                // 혼자만 있으면 채널 아카이브
+                log.info("Last member {} leaving channel {}. Archiving channel.", userId, channelId);
+                archiveChannel(channelId, userId);
+            }
+        }
+
+
         // 멤버 상태를 LEFT로 변경 (소프트 삭제)
         member.setStatus(MemberStatus.LEFT);
         member.setLeftAt(LocalDateTime.now());
@@ -676,7 +701,6 @@ public class ChannelServiceImpl implements ChannelService {
         channelMembersRepo.save(member);
 
         // 권한 정보 삭제
-        ChannelAuthorities authority = channelAuthoritiesRepo.findByChannelIdAndUserId(channelId, userId);
         if (authority != null) {
             channelAuthoritiesRepo.delete(authority);
         }
@@ -684,6 +708,7 @@ public class ChannelServiceImpl implements ChannelService {
         // 실제 활성 멤버 수로 업데이트
         Long actualMemberCount = channelMembersRepo.countActiveMembers(channelId);
         channel.setMemberCount(actualMemberCount.intValue());
+
         channelsRepo.save(channel);
 
         log.info("User {} left channel {} successfully. Remaining members: {}",

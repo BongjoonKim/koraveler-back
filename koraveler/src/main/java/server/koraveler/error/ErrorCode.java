@@ -44,6 +44,7 @@ public enum ErrorCode {
     UNAUTHORIZED_UPDATE_ROLE(HttpStatus.FORBIDDEN, "MBR_006", "역할 변경 권한이 없습니다"),
     UNAUTHORIZED_MUTE_MEMBER(HttpStatus.FORBIDDEN, "MBR_007", "멤버 음소거 권한이 없습니다"),
     UNAUTHORIZED_INVITE(HttpStatus.FORBIDDEN, "MBR_008", "초대 권한이 없습니다"),
+    OWNER_MUST_TRANSFER_ROLE(HttpStatus.BAD_REQUEST, "MBR_009","OWNER는 먼저 권한을 위임해야 합니다"),
 
     // ============= 번역 관련 에러 (TRANS) =============
     TRANSLATION_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "TRANS_001", "Translation failed"),
