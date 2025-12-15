@@ -6,6 +6,8 @@ import org.springframework.data.mongodb.repository.Update;
 import org.springframework.stereotype.Repository;
 import server.koraveler.chat.model.entities.ChannelAuthorities;
 
+import java.util.List;
+
 @Repository
 public interface ChannelAuthoritiesRepo extends MongoRepository<ChannelAuthorities, String> {
 
@@ -24,4 +26,8 @@ public interface ChannelAuthoritiesRepo extends MongoRepository<ChannelAuthoriti
 
     // 사용자가 채널에 권한을 가지고 있는지 확인
     boolean existsByChannelIdAndUserId(String channelId, String userId);
+
+    // ✅ 특정 역할을 가진 모든 사용자 조회
+    List<ChannelAuthorities> findByChannelIdAndRoleId(String channelId, String roleId);
+
 }
