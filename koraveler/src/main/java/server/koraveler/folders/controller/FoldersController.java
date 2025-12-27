@@ -10,7 +10,7 @@ import server.koraveler.folders.dto.FoldersDTO;
 import server.koraveler.folders.service.FolderService;
 
 @RestController
-@RequestMapping("/ps/folders")
+@RequestMapping("/folders")
 @RequiredArgsConstructor
 @Slf4j
 public class FoldersController {

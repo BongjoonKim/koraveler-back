@@ -55,7 +55,7 @@ public class FolderServiceImpl implements FolderService {
                     folders.setUserId(username);
 
                     // 최상위가 Root폴더인 경우
-                    if (folders.getParentId() == null) {
+                    if (folders.getParentId() == null || users.getId().equals(folders.getParentId())) {
                         folders.setParentId(users.getId());
                         folders.setPath("/" + users.getId());
                     // 최상위 폴더가 일반 폴더인 경우
