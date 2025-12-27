@@ -669,12 +669,14 @@ public class ChannelServiceImpl implements ChannelService {
         ChannelMembers member = channelMembersRepo.findByChannelIdAndUserId(channelId, userId)
                 .orElseThrow(() -> new CustomException(ErrorCode.NOT_CHANNEL_MEMBER));
 
+        boolean shouldArchive = false;
+
         // 채널 오너인 경우 추가 검증 필요
         ChannelAuthorities authority = channelAuthoritiesRepo.findByChannelIdAndUserId(channelId, userId);
         if (authority != null && "OWNER".equals(authority.getRoleId())) {
             Long actualMemberCount = channelMembersRepo.countActiveMembers(channelId);
 
-            if (actualMemberCount > 0) {
+            if (actualMemberCount > 1) {
                 // 다른 오너가 있는지 확인
                 List<ChannelAuthorities> otherOwners = channelAuthoritiesRepo
                         .findByChannelIdAndRoleId(channelId, "OWNER")
@@ -682,16 +684,15 @@ public class ChannelServiceImpl implements ChannelService {
                         .filter(auth -> !auth.getUserId().equals(userId))
                         .toList();
 
-                if (otherOwners.size() > 0) {
+                if (otherOwners.isEmpty()) {
                     throw new CustomException(ErrorCode.OWNER_MUST_TRANSFER_ROLE,
                             "Please delegate yout OWNER role");
                 }
             } else {
-                // 혼자만 있으면 채널 아카이브
-                log.info("Last member {} leaving channel {}. Archiving channel.", userId, channelId);
-                archiveChannel(channelId, userId);
+                shouldArchive = true;
             }
         }
+
 
 
         // 멤버 상태를 LEFT로 변경 (소프트 삭제)
@@ -708,6 +709,17 @@ public class ChannelServiceImpl implements ChannelService {
         // 실제 활성 멤버 수로 업데이트
         Long actualMemberCount = channelMembersRepo.countActiveMembers(channelId);
         channel.setMemberCount(actualMemberCount.intValue());
+
+        // 활성화된
+        if (actualMemberCount <= 1) {
+            shouldArchive = true;
+        }
+
+        if (shouldArchive) {
+            log.info("Last member {} leaving channel {}. Archiving channel.", userId, channelId);
+            channel.setIsArchived(true);
+            channel.setArchivedAt(LocalDateTime.now());
+        }
 
         channelsRepo.save(channel);
 
