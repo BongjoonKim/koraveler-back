@@ -3,11 +3,14 @@ package server.koraveler.chat.service.serviceImpl;
 import kotlin.collections.ArrayDeque;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import server.koraveler.chat.dto.event.NewMessageEvent;
 import server.koraveler.chat.dto.request.*;
 import server.koraveler.chat.dto.response.*;
 import server.koraveler.chat.dto.mapper.MessageMapper;
@@ -40,6 +43,10 @@ public class MessageServiceImpl implements MessageService {
     private final ChannelsRepo channelsRepo;
     private final MessageMapper messageMapper;
 
+    // 이벤트 발행을 위한 ApplicationEventPublisher 주입
+    private final ApplicationEventPublisher eventPublisher;
+    private final SimpMessagingTemplate messagingTemplate;
+
     @Override
     public MessageResponse createMessage(MessageCreateRequest request, String userId) {
         log.info("Creating message for user: {} in channel: {}", userId, request.getChannelId());
@@ -63,13 +70,22 @@ public class MessageServiceImpl implements MessageService {
         // 채널의 마지막 메시지 정보 업데이트
         updateChannelLastMessage(request.getChannelId(), savedMessage.getId());
 
+        // 응답 생성
+        MessageResponse response = messageMapper.toResponse(savedMessage);
+
         // 멘션된 사용자들에게 알림 처리 (비동기)
         if (request.getMentionedUserIds() != null && !request.getMentionedUserIds().isEmpty()) {
             processMentionNotifications(savedMessage, request.getMentionedUserIds());
         }
 
+        // 같은 채널 구독자들에게 새 메세지 이벤트 발행
+        messagingTemplate.convertAndSend(
+                "/topic/channel/" + request.getChannelId() + "/new-message",
+                new NewMessageEvent(request.getChannelId(), savedMessage.getId(), userId)
+        );
+
         log.info("Message created successfully: {}", savedMessage.getId());
-        return messageMapper.toResponse(savedMessage);
+        return response;
     }
 
     @Override
@@ -90,6 +106,12 @@ public class MessageServiceImpl implements MessageService {
         message.setUpdatedAt(LocalDateTime.now());
 
         Messages updatedMessage = messagesRepo.save(message);
+
+        // 메세지 수정 이벤트 발생
+        messagingTemplate.convertAndSend(
+                "/topic/channel/" + message.getChannelId() + "/message-updated",
+                new NewMessageEvent(message.getChannelId(), messageId, userId)
+        );
 
         log.info("Message updated successfully: {}", messageId);
         return messageMapper.toResponse(updatedMessage);
@@ -113,6 +135,12 @@ public class MessageServiceImpl implements MessageService {
         message.setStatus(MessageStatus.DELETED);
 
         messagesRepo.save(message);
+
+        messagingTemplate.convertAndSend(
+                "/topic/channel/" + message.getChannelId() + "/message-deleted",
+                new NewMessageEvent(message.getChannelId(), messageId, userId)
+        );
+
         log.info("Message deleted successfully: {}", messageId);
     }
 
