@@ -43,4 +43,6 @@ public interface ChannelMembersRepo extends MongoRepository<ChannelMembers, Stri
 
     // 채널의 모든 멤버 조회 (상태 관계없이)
     List<ChannelMembers> findByChannelId(String channelId);
+
+    Optional<ChannelMembers> findByChannelIdAndUserIdAndStatus(String channelId, String userId, MemberStatus status);
 }

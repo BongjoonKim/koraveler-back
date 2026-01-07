@@ -3,8 +3,10 @@ package server.koraveler.chat.service.serviceImpl;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import server.koraveler.chat.dto.event.ChannelEvent;
 import server.koraveler.chat.dto.mapper.ChannelMapper;
 import server.koraveler.chat.dto.request.ChannelJoinRequest;
 import server.koraveler.chat.dto.response.ChannelMemberResponse;
@@ -26,6 +28,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @Slf4j
@@ -39,36 +42,59 @@ public class ChannelMemberServiceImpl implements ChannelMemberService {
     private final ChannelAuthoritiesRepo channelAuthoritiesRepo;
     private final ChannelMapper channelMapper;
 
+    private final SimpMessagingTemplate messagingTemplate;
+
     @Override
     @Transactional
     public ChannelMemberResponse addMember(String channelId, String userId, String addedByUserId) {
         log.info("Adding member {} to channel {} by {}", userId, channelId, addedByUserId);
-
-        // 이미 멤버인지 확인
-        if (channelMembersRepo.existsByChannelIdAndUserId(channelId, userId)) {
-            throw new CustomException(ErrorCode.ALREADY_CHANNEL_MEMBER);
-        }
 
         // 멤버 추가 권한 확인 (자기 자신을 추가하는 경우는 권한 체크 생략)
         if (!addedByUserId.equals(userId) && !hasAddMemberPermission(channelId, addedByUserId)) {
             throw new CustomException(ErrorCode.UNAUTHORIZED_ADD_MEMBER);
         }
 
-        // 새 멤버 생성
-        ChannelMembers member = ChannelMembers.builder()
-                .userId(userId)
-                .channelId(channelId)
-                .status(MemberStatus.ACTIVE)
-                .joinedAt(LocalDateTime.now())
-                .lastSeenAt(LocalDateTime.now())
-                .notificationsEnabled(true)
-                .notificationLevel(NotificationLevel.ALL)
-                .isMuted(false)
-                .createdAt(LocalDateTime.now())
-                .updatedAt(LocalDateTime.now())
-                .build();
+        // 기존 멤버십 확인
+        Optional<ChannelMembers> existingMember = channelMembersRepo.findByChannelIdAndUserId(channelId, userId);
 
-        ChannelMembers savedMember = channelMembersRepo.save(member);
+        ChannelMembers savedMember = null;
+
+        if (existingMember.isPresent()) {
+            ChannelMembers member = existingMember.get();
+
+            // 이미 ACTIVE 상태면 에러
+            if (member.getStatus() == MemberStatus.ACTIVE) {
+                throw new CustomException(ErrorCode.ALREADY_CHANNEL_MEMBER);
+            }
+
+            // LEFT 상태면 다시 ACTIVE로 변경
+            member.setStatus(MemberStatus.ACTIVE);
+            member.setLastSeenAt(LocalDateTime.now());
+            member.setUpdatedAt(LocalDateTime.now());
+            savedMember = channelMembersRepo.save(member);
+
+            log.info("Member {} rejoined channel {}", userId, channelId);
+
+        } else {
+            // 새 멤버 생성
+            ChannelMembers member = ChannelMembers.builder()
+                    .userId(userId)
+                    .channelId(channelId)
+                    .status(MemberStatus.ACTIVE)
+                    .joinedAt(LocalDateTime.now())
+                    .lastSeenAt(LocalDateTime.now())
+                    .notificationsEnabled(true)
+                    .notificationLevel(NotificationLevel.ALL)
+                    .isMuted(false)
+                    .createdAt(LocalDateTime.now())
+                    .updatedAt(LocalDateTime.now())
+                    .build();
+
+            savedMember = channelMembersRepo.save(member);
+            log.info("New member {} added to channel {}", userId, channelId);
+        }
+
+
 
         // 새 멤버에게 기본 권한 부여 (이미 권한이 없는 경우에만)
         if (!channelAuthoritiesRepo.existsByChannelIdAndUserId(channelId, userId)) {
@@ -98,6 +124,21 @@ public class ChannelMemberServiceImpl implements ChannelMemberService {
         }
 
         log.info("Member {} added to channel {} successfully", userId, channelId);
+
+        // 멤버 추가 이벤트 전송
+        messagingTemplate.convertAndSend(
+                "/topic/channel/" + channelId + "/member-added",
+                ChannelEvent.builder()
+                        .eventType("MEMBER_ADDED")
+                        .channelId(channelId)
+                        .userId(addedByUserId)
+                        .data(Map.of(
+                                "addedUserId", userId,
+                                "addedByUserId", addedByUserId
+                        ))
+                        .build()
+        );
+
         return toChannelMemberResponse(savedMember);
     }
 
@@ -119,6 +160,20 @@ public class ChannelMemberServiceImpl implements ChannelMemberService {
         member.setUpdatedAt(LocalDateTime.now());
 
         channelMembersRepo.save(member);
+
+        // 멤버 제거 이벤트 전송
+        messagingTemplate.convertAndSend(
+                "/topic/channel/" + channelId + "/member-removed",
+                ChannelEvent.builder()
+                        .eventType("MEMBER_REMOVED")
+                        .channelId(channelId)
+                        .userId(removedByUserId)
+                        .data(Map.of(
+                                "removedUserId", userId,
+                                "removedByUserId", removedByUserId
+                        ))
+                        .build()
+        );
 
         log.info("Member {} removed from channel {} successfully", userId, channelId);
     }
@@ -178,6 +233,22 @@ public class ChannelMemberServiceImpl implements ChannelMemberService {
                 .orElseThrow(() -> new CustomException(ErrorCode.NOT_CHANNEL_MEMBER));
 
         log.info("Member {} role updated successfully", targetUserId);
+
+        // 역할 변경 이벤트 전송
+        messagingTemplate.convertAndSend(
+                "/topic/channel/" + channelId + "/member-role-updated",
+                ChannelEvent.builder()
+                        .eventType("MEMBER_ROLE_UPDATED")
+                        .channelId(channelId)
+                        .userId(updatedByUserId)
+                        .data(Map.of(
+                                "targetUserId", targetUserId,
+                                "newRoleId", roleId,
+                                "updatedByUserId", updatedByUserId
+                        ))
+                        .build()
+        );
+
         return toChannelMemberResponse(member);
     }
 
@@ -228,6 +299,22 @@ public class ChannelMemberServiceImpl implements ChannelMemberService {
         ChannelMembers mutedMember = channelMembersRepo.save(member);
 
         log.info("Member {} muted successfully", targetUserId);
+
+        // 멤버 음소거 이벤트 전송
+        messagingTemplate.convertAndSend(
+                "/topic/channel/" + channelId + "/member-muted",
+                ChannelEvent.builder()
+                        .eventType("MEMBER_MUTED")
+                        .channelId(channelId)
+                        .userId(mutedByUserId)
+                        .data(Map.of(
+                                "mutedUserId", targetUserId,
+                                "mutedByUserId", mutedByUserId,
+                                "muteMinutes", muteMinutes
+                        ))
+                        .build()
+        );
+
         return toChannelMemberResponse(mutedMember);
     }
 
@@ -250,6 +337,21 @@ public class ChannelMemberServiceImpl implements ChannelMemberService {
         ChannelMembers unmutedMember = channelMembersRepo.save(member);
 
         log.info("Member {} unmuted successfully", targetUserId);
+
+        // 멤버 음소거 해제 이벤트 전송
+        messagingTemplate.convertAndSend(
+                "/topic/channel/" + channelId + "/member-unmuted",
+                ChannelEvent.builder()
+                        .eventType("MEMBER_UNMUTED")
+                        .channelId(channelId)
+                        .userId(unmutedByUserId)
+                        .data(Map.of(
+                                "unmutedUserId", targetUserId,
+                                "unmutedByUserId", unmutedByUserId
+                        ))
+                        .build()
+        );
+
         return toChannelMemberResponse(unmutedMember);
     }
 
