@@ -3,8 +3,10 @@ package server.koraveler.chat.service.serviceImpl;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import server.koraveler.chat.dto.event.ChannelEvent;
 import server.koraveler.chat.dto.request.*;
 import server.koraveler.chat.dto.response.*;
 import server.koraveler.chat.dto.mapper.ChannelMapper;
@@ -40,6 +42,8 @@ public class ChannelServiceImpl implements ChannelService {
     private final ChannelAuthoritiesRepo channelAuthoritiesRepo;  // 추가
     private final ChannelMemberService channelMemberService;
     private final ChannelMapper channelMapper;
+
+    private final SimpMessagingTemplate messagingTemplate;
 
     // ChannelServiceImpl.java에 추가할 메서드들
 
@@ -391,6 +395,17 @@ public class ChannelServiceImpl implements ChannelService {
 
         ChannelResponse response = channelMapper.toResponse(savedChannel);
         enrichChannelResponse(response, userId);
+
+        messagingTemplate.convertAndSend(
+                "/topic/user/" + userId + "/channel-created",
+                ChannelEvent.builder()
+                        .eventType("CREATED")
+                        .channelId(savedChannel.getId())
+                        .userId(userId)
+                        .data(request)
+                        .build()
+        );
+
         return response;
     }
 
@@ -435,7 +450,20 @@ public class ChannelServiceImpl implements ChannelService {
         Channels updatedChannel = channelsRepo.save(channel);
 
         log.info("Channel updated successfully: {}", channelId);
-        return channelMapper.toResponse(updatedChannel);
+
+        ChannelResponse response = channelMapper.toResponse(updatedChannel);
+
+        messagingTemplate.convertAndSend(
+                "/topic/channel/" + channelId + "/channel-updated",
+                ChannelEvent.builder()
+                        .eventType("UPDATED")
+                        .channelId(channelId)
+                        .userId(userId)
+                        .data(response)
+                        .build()
+        );
+
+        return response;
     }
 
     @Override
@@ -452,6 +480,15 @@ public class ChannelServiceImpl implements ChannelService {
 
         // 소프트 삭제 (아카이브)
         archiveChannel(channelId, userId);
+
+        messagingTemplate.convertAndSend(
+                "/topic/channel/" + channelId + "/channel-deleted",
+                ChannelEvent.builder()
+                        .eventType("DELETED")
+                        .channelId(channelId)
+                        .userId(userId)
+                        .build()
+        );
 
         log.info("Channel deleted successfully: {}", channelId);
     }
@@ -653,6 +690,32 @@ public class ChannelServiceImpl implements ChannelService {
 
         ChannelResponse response = channelMapper.toResponse(channel);
         enrichChannelResponse(response, userId);
+
+
+        // 멤버 참여 이벤트를 채널의 모든 멤버에게 전송
+        messagingTemplate.convertAndSend(
+                "/topic/channel/" + channelId + "/member-joined",
+                ChannelEvent.builder()
+                        .eventType("MEMBER_JOINED")
+                        .channelId(channelId)
+                        .userId(userId)
+                        .data(Map.of(
+                                "memberCount", actualMemberCount,
+                                "newMemberId", userId
+                        ))
+                        .build()
+        );
+
+        messagingTemplate.convertAndSend(
+                "/topic/user/" + userId + "/channel-joined",
+                ChannelEvent.builder()
+                        .eventType("JOINED")
+                        .channelId(channelId)
+                        .userId(userId)
+                        .data(response)
+                        .build()
+        );
+
         return response;
     }
 
@@ -725,6 +788,31 @@ public class ChannelServiceImpl implements ChannelService {
 
         log.info("User {} left channel {} successfully. Remaining members: {}",
                 userId, channelId, actualMemberCount);
+
+        // 멤버 탈퇴 이벤트를 채널의 나머지 멤버들에게 전송
+        messagingTemplate.convertAndSend(
+                "/topic/channel/" + channelId + "/member-left",
+                ChannelEvent.builder()
+                        .eventType("MEMBER_LEFT")
+                        .channelId(channelId)
+                        .userId(userId)
+                        .data(Map.of(
+                                "memberCount", actualMemberCount,
+                                "leftMemberId", userId,
+                                "isArchived", shouldArchive
+                        ))
+                        .build()
+        );
+
+        // 탈퇴한 사용자에게 개인 알림
+        messagingTemplate.convertAndSend(
+                "/topic/user/" + userId + "/channel-left",
+                ChannelEvent.builder()
+                        .eventType("LEFT")
+                        .channelId(channelId)
+                        .userId(userId)
+                        .build()
+        );
     }
 
 
@@ -751,6 +839,16 @@ public class ChannelServiceImpl implements ChannelService {
 
         channel.setUpdatedAt(LocalDateTime.now());
         channelsRepo.save(channel);
+
+        // 설정 변경 이벤트
+        messagingTemplate.convertAndSend(
+                "/topic/channel/" + channelId + "/settings-updated",
+                ChannelEvent.builder()
+                        .eventType("SETTINGS_UPDATED")
+                        .channelId(channelId)
+                        .userId(userId)
+                        .build()
+        );
 
         return getChannel(channelId, userId);
     }
