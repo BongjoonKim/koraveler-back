@@ -254,6 +254,7 @@ jobs:
                   echo "Testing health endpoints..."
                   curl -s http://localhost:3003/health > /dev/null 2>&1 && echo "✅ /health endpoint is responding" || echo "⚠️ /health endpoint not responding"
                   curl -s http://localhost:3003/actuator/health > /dev/null 2>&1 && echo "✅ /actuator/health endpoint is responding" || echo "⚠️ /actuator/health endpoint not responding"
+                  curl -s http://localhost:3003/redis-test > /dev/null 2>&1 && echo "✅ Redis is working" || echo "❌ Redis connection failed"
                 else
                   echo "⚠️ Warning: Port 3003 is not listening yet (may still be starting)"
                 fi
