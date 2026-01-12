@@ -20,7 +20,7 @@ import java.util.Map;
 public class ViewController {
     private final ViewService viewService;
 
-    @PostMapping("/ps/{documentId")
+    @PostMapping("/ps/{documentId}")
     public ResponseEntity<?> incrementView(
             @PathVariable String documentId,
             HttpServletRequest request
