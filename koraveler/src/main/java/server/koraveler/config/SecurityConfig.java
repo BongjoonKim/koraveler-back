@@ -70,6 +70,14 @@ public class SecurityConfig {
             .authorizeHttpRequests(req -> req
                     .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                     .requestMatchers(new ContainsPsRequestMatcher()).permitAll()
+                    // 조회수 증가 API (비인증 허용)
+                    .requestMatchers(HttpMethod.POST, "/api/v1/views/**").permitAll()
+                    // 조회수 조회 API (비인증 허용)
+                    .requestMatchers(HttpMethod.GET, "/api/v1/views/**").permitAll()
+                    // 태그 조회 API (비인증 허용)
+                    .requestMatchers(HttpMethod.GET, "/api/v1/tags/**").permitAll()
+                    // 댓글 조회 API (비인증 허용)
+                    .requestMatchers(HttpMethod.GET, "/api/v1/comments/**").permitAll()
                 .anyRequest().authenticated()
             ).sessionManagement(session -> session
                 .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
