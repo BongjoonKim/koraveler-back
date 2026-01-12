@@ -33,6 +33,8 @@ public interface ViewsRepo extends MongoRepository<DocumentView, String> {
             LocalDateTime end
     );
 
+    long countByDocumentIdAndViewedAtAfter(String documentId, LocalDateTime after);
+
     // 특정 문서의 모든 조회 기록 (통계용)
     List<DocumentView> findByDocumentIdOrderByViewedAtDesc(String documentId);
 

@@ -41,6 +41,7 @@ jobs:
           NAVER_MAP_CLIENT_ID: ${{ secrets.NAVER_MAP_CLIENT_ID }}
           NAVER_MAP_CLIENT_SECRET: ${{ secrets.NAVER_MAP_CLIENT_SECRET }}
           KAKAO_API_KEY: ${{ secrets.KAKAO_API_KEY }}
+          REDIS_HOST: ${{secrets.REDIS_HOST}}
         run: |
           # SSH 키 설정
           echo "$PRIVATE_KEY" > private_key.pem
@@ -130,6 +131,10 @@ jobs:
                 username: haries
                 password: ${MONGODB_PASSWORD}
                 database: koraveler
+              redis:
+                host: ${REDIS_HOST}
+                port: 6379
+                timeout : 5000ms
             weather:
               url: https://api.openweathermap.org/data/2.5/weather
               key: ${WEATHER_API_KEY}
