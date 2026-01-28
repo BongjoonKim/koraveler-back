@@ -5,6 +5,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import server.koraveler.blog.dto.DocumentViewResponse;
+import server.koraveler.blog.dto.IncreaseViewRequest;
 import server.koraveler.blog.dto.ViewDTO;
 import server.koraveler.blog.dto.ViewStatsDTO;
 import server.koraveler.blog.service.ViewService;
@@ -39,12 +41,17 @@ public class ViewController {
             boolean increased = viewService.incrementView(viewDTO);
 
 
-            Map<String, Object> response = new HashMap<>();
-            response.put("documentId", documentId);
-            response.put("increased", increased);
-            response.put("totalViews", viewService.getTotalViews(documentId));
+//            Map<String, Object> response = new HashMap<>();
+//            response.put("documentId", documentId);
+//            response.put("increased", increased);
+//            response.put("totalViews", viewService.getTotalViews(documentId));
 
-            return ResponseEntity.ok(response);
+            IncreaseViewRequest viewRequest = new IncreaseViewRequest();
+            viewRequest.setDocumentId(documentId);
+            viewRequest.setIncreased(increased);
+            viewRequest.setTotalViews(viewService.getTotalViews(documentId));
+
+            return ResponseEntity.ok(viewRequest);
         } catch (Exception e) {
             log.error("조회수 증가 실패: {}", documentId, e);
             return ResponseEntity.internalServerError()
@@ -58,12 +65,16 @@ public class ViewController {
     @GetMapping("/ps/{documentId}")
     public ResponseEntity<?> getViews(@PathVariable String documentId) {
         try {
-            Map<String, Object> response = new HashMap<>();
-            response.put("documentId", documentId);
-            response.put("totalViews", viewService.getTotalViews(documentId));
-            response.put("todayViews", viewService.getTodayViews(documentId));
+//            Map<String, Object> response = new HashMap<>();
+//            response.put("documentId", documentId);
+//            response.put("totalViews", viewService.getTotalViews(documentId));
+//            response.put("todayViews", viewService.getTodayViews(documentId));
 
-            return ResponseEntity.ok(response);
+            DocumentViewResponse documentViewResponse = new DocumentViewResponse();
+            documentViewResponse.setDocumentId(documentId);
+            documentViewResponse.setTotalViews(viewService.getTotalViews(documentId));
+            documentViewResponse.setTodayViews(viewService.getTodayViews(documentId));
+            return ResponseEntity.ok(documentViewResponse);
         } catch (Exception e) {
             log.error("조회수 조회 실패: {}", documentId, e);
             return ResponseEntity.internalServerError()
