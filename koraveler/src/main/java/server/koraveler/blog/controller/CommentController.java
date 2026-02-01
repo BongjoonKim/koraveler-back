@@ -17,6 +17,7 @@ import server.koraveler.users.dto.CustomUserDetails;
 
 import java.util.List;
 
+@RestController
 @RequestMapping("/api/v1/comments")
 @RequiredArgsConstructor
 @Slf4j

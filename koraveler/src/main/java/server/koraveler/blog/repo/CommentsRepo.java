@@ -12,13 +12,13 @@ import java.util.List;
 @Repository
 public interface CommentsRepo extends MongoRepository<Comment, String> {
     // 특정 문서의 1depth 댓글만 조회
-    Page<Comment> findByDocumentIdAndDepthAndDeletedFalse(String documentId, int depth, Pageable pageable);
+    Page<Comment> findByDocumentIdAndDepthAndIsDeletedFalse(String documentId, int depth, Pageable pageable);
 
     // 특정 문서의 1depth 댓글만 조회 (숨김 포함 전체 - 관리자용)
     Page<Comment> findByDocumentIdAndDepth(String documentId, int depth, Pageable pageable);
 
     // 특정 부모 댓글의 대댓글 조회 (삭제되지 않은 것만)
-    List<Comment> findByParentIdAndDeletedFalse(String parentId);
+    List<Comment> findByParentIdAndIsDeletedFalse(String parentId);
 
     // 특정 부모 댓글의 대댓글 조회 (전체)
     List<Comment> findByParentId(String parentId);
@@ -39,4 +39,9 @@ public interface CommentsRepo extends MongoRepository<Comment, String> {
 
     // 특정 문서의 특정 depth 댓글 수
     long countByDocumentIdAndDepthAndDeletedFalse(String documentId, int depth);
+
+    long countByParentIdAndIsDeletedFalse(String parentId);
+
+    List<Comment> findByParentIdAndIsDeletedFalseOrderByCreatedAsc(String parentId);
+
 }

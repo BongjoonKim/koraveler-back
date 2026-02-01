@@ -31,4 +31,7 @@ public interface CommentService {
 
     // 단일 댓글 조회
     CommentDTO getComment(String commentId, String userId) throws Exception;
+
+    // 대댓글이 있는지 없는지 체크
+    List<CommentDTO> getRepliesByParentId(String parentId, String userId) throws Exception;
 }

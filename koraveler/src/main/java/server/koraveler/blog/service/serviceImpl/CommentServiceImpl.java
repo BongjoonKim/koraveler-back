@@ -186,7 +186,7 @@ public class CommentServiceImpl implements CommentService {
     @Override
     public CommentPageDTO getRootComments(String documentId, String userId, Pageable pageable) throws Exception {
         // depth 0인 댓글만 조회
-        Page<Comment> commentPage = commentsRepo.findByDocumentIdAndDepthAndDeletedFalse(
+        Page<Comment> commentPage = commentsRepo.findByDocumentIdAndDepthAndIsDeletedFalse(
                 documentId, 0, pageable);
 
         List<CommentDTO> commentDTOs = commentPage.getContent().stream()
@@ -205,7 +205,7 @@ public class CommentServiceImpl implements CommentService {
     @Override
     public List<CommentDTO> getReplies(String parentId, String userId) throws Exception {
         // 해당 부모의 직접 대댓글들 조회
-        List<Comment> replies = commentsRepo.findByParentIdAndDeletedFalse(parentId);
+        List<Comment> replies = commentsRepo.findByParentIdAndIsDeletedFalse(parentId);
 
         List<CommentDTO> replyDTOs = new ArrayList<>();
 
@@ -214,7 +214,7 @@ public class CommentServiceImpl implements CommentService {
 
             // depth 1인 경우 하위 대대댓글(depth 2)도 조회
             if (reply.getDepth() == 1) {
-                List<Comment> subReplies = commentsRepo.findByParentIdAndDeletedFalse(reply.getId());
+                List<Comment> subReplies = commentsRepo.findByParentIdAndIsDeletedFalse(reply.getId());
                 List<CommentDTO> subReplyDTOs = subReplies.stream()
                         .map(subReply -> convertCommentToDTO(subReply, userId))
                         .collect(Collectors.toList());
@@ -250,9 +250,22 @@ public class CommentServiceImpl implements CommentService {
         // 좋아요 여부는 LikeService에서 별도로 처리 (일단 false로 설정)
         dto.setLikedByMe(false);
 
-        // 대댓글 목록 초기화
+        // 대댓글 개수 조회
+        long replyCount = commentsRepo.countByParentIdAndIsDeletedFalse(comment.getId());
+        dto.setReplyCount(replyCount);
+
+        // replies는 빈 배열 (프론트에서 별도 API로 조회)
         dto.setReplies(new ArrayList<>());
 
         return dto;
+    }
+
+    @Override
+    public List<CommentDTO> getRepliesByParentId(String parentId, String userId) throws Exception {
+        List<Comment> replies = commentsRepo.findByParentIdAndIsDeletedFalseOrderByCreatedAsc(parentId);
+
+        return replies.stream()
+                .map(comment -> convertCommentToDTO(comment, userId))
+                .collect(Collectors.toList());
     }
 }
