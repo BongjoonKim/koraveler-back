@@ -11,6 +11,7 @@ import server.koraveler.blog.dto.CommentPageDTO;
 import server.koraveler.blog.model.Comment;
 import server.koraveler.blog.repo.BlogsRepo;
 import server.koraveler.blog.repo.CommentsRepo;
+import server.koraveler.blog.service.CommentLikeService;
 import server.koraveler.blog.service.CommentService;
 import server.koraveler.users.repo.UsersRepo;
 
@@ -28,6 +29,9 @@ public class CommentServiceImpl implements CommentService {
 
     @Autowired
     private BlogsRepo blogsRepo;
+
+    @Autowired
+    private CommentLikeService commentLikeService;
 
     @Override
     public CommentDTO createComment(CommentDTO commentDTO, String userId) throws Exception {
@@ -131,6 +135,9 @@ public class CommentServiceImpl implements CommentService {
         comment.setUpdatedUser(userId);
 
         commentsRepo.save(comment);
+
+        // 댓글 좋아요 데이터 삭제
+        commentLikeService.deleteAllByCommentId(commentId);
 
         log.info("댓글 삭제 완료: commentId={}", commentId);
     }
@@ -247,8 +254,13 @@ public class CommentServiceImpl implements CommentService {
         // 작성자 여부
         dto.setAmIWriter(userId != null && userId.equals(comment.getUserId()));
 
-        // 좋아요 여부는 LikeService에서 별도로 처리 (일단 false로 설정)
-        dto.setLikedByMe(false);
+        // 좋아요 여부 및 좋아요 수 조회
+        if (userId != null) {
+            dto.setLikedByMe(commentLikeService.hasLiked(comment.getId(), userId));
+        } else {
+            dto.setLikedByMe(false);
+        }
+        dto.setLikeCount(commentLikeService.getLikeCount(comment.getId()));
 
         // 대댓글 개수 조회
         long replyCount = commentsRepo.countByParentIdAndIsDeletedFalse(comment.getId());

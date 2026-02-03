@@ -11,4 +11,6 @@ public class CommentDTO extends Comment {
     private boolean isLikedByMe;
     private boolean amIWriter;
     private long replyCount;
+    private long likeCount;
+
 }
