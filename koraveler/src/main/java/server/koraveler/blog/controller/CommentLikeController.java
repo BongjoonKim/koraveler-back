@@ -41,7 +41,7 @@ public class CommentLikeController {
     }
 
     // 특정 댓글의 좋아요 상태 조회
-    @GetMapping("/{commentId}/like")
+    @GetMapping("/ps/{commentId}/like")
     public ResponseEntity<CommentLikeDTO> getLikeStatus(
             @PathVariable String commentId,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
@@ -62,7 +62,7 @@ public class CommentLikeController {
     }
 
     // 여러 댓글의 좋아요 상태 일괄 조회 (댓글 목록용)
-    @PostMapping("/likes/status")
+    @PostMapping("/ps/likes/status")
     public ResponseEntity<Map<String, Object>> getLikeStatuses(
             @RequestBody Map<String, List<String>> request,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
