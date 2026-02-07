@@ -401,7 +401,7 @@ public class BlogServiceImpl implements BlogService {
             Sort sort = Sort.by(updatedSort);
             Pageable pageable = PageRequest.of(pageDTO.getPage(), pageDTO.getSize(), sort);
 
-            Page<Documents> documents = blogsRepo.findAllByTitleContainingIgnoreCaseOrContentsContainingIgnoreCase(value, value, pageable);
+            Page<Documents> documents = blogsRepo.findByTitleOrContentsWithDisclose(value, value, pageable);
 
             List<DocumentsDTO> documentsDTO = new ArrayList<>();
             DocumentsInfo documentsInfo = new DocumentsInfo();

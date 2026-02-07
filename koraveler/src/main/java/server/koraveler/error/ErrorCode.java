@@ -17,6 +17,9 @@ public enum ErrorCode {
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "USER_001", "User not found"),
     USER_ALREADY_EXISTS(HttpStatus.CONFLICT, "USER_002", "User already exists"),
     INVALID_CREDENTIALS(HttpStatus.UNAUTHORIZED, "USER_003", "Invalid credentials"),
+    PASSWORD_MISMATCH(HttpStatus.BAD_REQUEST, "USER_004", "Current password does not match"),
+    EMAIL_ALREADY_EXISTS(HttpStatus.CONFLICT, "USER_005", "Email is already in use"),
+    ACCOUNT_DISABLED(HttpStatus.FORBIDDEN, "USER_006", "Account has been disabled"),
 
     // ============= 메시지 관련 에러 (MSG) =============
     MESSAGE_NOT_FOUND(HttpStatus.NOT_FOUND, "MSG_001", "메시지를 찾을 수 없습니다"),

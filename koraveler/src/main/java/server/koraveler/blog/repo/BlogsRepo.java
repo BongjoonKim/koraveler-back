@@ -22,8 +22,11 @@ public interface BlogsRepo extends MongoRepository<Documents, String> {
     long count();
 
     Page<Documents> findAllByDraftIsFalseOrDraftIsNull(Pageable pageable);
-    Page<Documents> findAllByTitleContainingIgnoreCaseOrContentsContainingIgnoreCase(String titleValue, String contentsValue, Pageable pageable);
-
+    @Query("{ 'disclose': true, '$or': [ " +
+            "{ 'title': { '$regex': ?0, '$options': 'i' } }, " +
+            "{ 'contents': { '$regex': ?1, '$options': 'i' } } " +
+            "] }")
+    Page<Documents> findByTitleOrContentsWithDisclose(String titleValue, String contentsValue, Pageable pageable);
     // Featured Ready인 문서들 조회
     Page<Documents> findByFeaturedReadyTrueAndDraftFalse(Pageable pageable);
 
