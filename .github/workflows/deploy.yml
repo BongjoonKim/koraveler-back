@@ -17,15 +17,11 @@ jobs:
           java-version: '21'
           distribution: 'temurin'
 
-      # koraveler 폴더로 이동해서 빌드
       - name: Grant execute permission for gradlew
-        run: |
-          cd koraveler
-          chmod +x gradlew
+        run: chmod +x gradlew
 
       - name: Build with Gradle
         run: |
-          cd koraveler
           ./gradlew build -x test  # 테스트를 제외하고 빌드
           ./gradlew build
 
@@ -42,6 +38,8 @@ jobs:
           NAVER_MAP_CLIENT_SECRET: ${{ secrets.NAVER_MAP_CLIENT_SECRET }}
           KAKAO_API_KEY: ${{ secrets.KAKAO_API_KEY }}
           REDIS_HOST: ${{secrets.REDIS_HOST}}
+          AWS_ACCESS_KEY: ${{ secrets.AWS_ACCESS_KEY }}
+          AWS_SECRET_KEY: ${{ secrets.AWS_SECRET_KEY }}
         run: |
           # SSH 키 설정
           echo "$PRIVATE_KEY" > private_key.pem
@@ -51,13 +49,13 @@ jobs:
           mkdir -p ~/.ssh
           ssh-keyscan -H $HOST >> ~/.ssh/known_hosts
           
-          # 빌드된 JAR 파일 EC2로 복사 (koraveler 폴더에서)
-          scp -i private_key.pem koraveler/build/libs/koraveler-0.0.1-SNAPSHOT.jar $USER@$HOST:~/koraveler-back/koraveler/build/libs/
+          # 빌드된 JAR 파일 EC2로 복사
+          scp -i private_key.pem build/libs/koraveler-0.0.1-SNAPSHOT.jar $USER@$HOST:~/koraveler-back/build/libs/
           
           # start.sh 파일을 먼저 로컬에서 생성 (프로파일 설정 제거)
           cat > start.sh << 'STARTSCRIPT'
           #!/bin/bash
-          APP_DIR="/home/ubuntu/koraveler-back/koraveler"
+          APP_DIR="/home/ubuntu/koraveler-back"
           JAR_FILE="$APP_DIR/build/libs/koraveler-0.0.1-SNAPSHOT.jar"
           LOG_DIR="$APP_DIR/logs"
           PID_FILE="$APP_DIR/app.pid"
@@ -103,21 +101,21 @@ jobs:
           STARTSCRIPT
           
           # start.sh를 EC2로 복사
-          scp -i private_key.pem start.sh $USER@$HOST:~/koraveler-back/koraveler/
+          scp -i private_key.pem start.sh $USER@$HOST:~/koraveler-back/
           rm -f start.sh
           
           # EC2에서 배포 실행
           ssh -i private_key.pem $USER@$HOST << ENDSSH
-            cd ~/koraveler-back/koraveler
-          
+            cd ~/koraveler-back
+
             # 로그 디렉토리 생성 (없는 경우)
-            mkdir -p ~/koraveler-back/koraveler/logs
-          
+            mkdir -p ~/koraveler-back/logs
+
             # src/main/resources 디렉토리 생성
-            mkdir -p ~/koraveler-back/koraveler/src/main/resources
-          
+            mkdir -p ~/koraveler-back/src/main/resources
+
             # application.yml 파일 생성 (기본 설정 파일로 사용)
-            cat > ~/koraveler-back/koraveler/application.yml << APPCONFIG
+            cat > ~/koraveler-back/application.yml << APPCONFIG
           server:
             port: 3003
           
@@ -161,6 +159,14 @@ jobs:
               local: http://localhost:3002
               prod: https://www.koraveler.com
           
+          cloud:
+            aws:
+              credentials:
+                access-key: ${AWS_ACCESS_KEY}
+                secret-key: ${AWS_SECRET_KEY}
+              region:
+                static: ap-northeast-2
+
           # 액추에이터 설정 (헬스체크용)
           management:
             endpoints:
@@ -174,15 +180,15 @@ jobs:
           APPCONFIG
           
             # src/main/resources에도 복사 (빌드 시 포함되도록)
-            cp ~/koraveler-back/koraveler/application.yml ~/koraveler-back/koraveler/src/main/resources/application.yml
-          
+            cp ~/koraveler-back/application.yml ~/koraveler-back/src/main/resources/application.yml
+
             # build/resources/main 디렉토리가 있으면 거기에도 복사
-            if [ -d ~/koraveler-back/koraveler/build/resources/main ]; then
-              cp ~/koraveler-back/koraveler/application.yml ~/koraveler-back/koraveler/build/resources/main/
+            if [ -d ~/koraveler-back/build/resources/main ]; then
+              cp ~/koraveler-back/application.yml ~/koraveler-back/build/resources/main/
             fi
-          
+
             # JAR 파일과 같은 위치에도 복사 (외부 설정 파일로 사용)
-            cp ~/koraveler-back/koraveler/application.yml ~/koraveler-back/koraveler/build/libs/
+            cp ~/koraveler-back/application.yml ~/koraveler-back/build/libs/
           
             # Git pull (최신 코드 가져오기) - 루트 디렉토리에서
             echo "========================================="
@@ -193,8 +199,7 @@ jobs:
             git reset --hard origin/production
             git pull
           
-            # 다시 koraveler 폴더로 이동
-            cd ~/koraveler-back/koraveler
+            cd ~/koraveler-back
           
             # 기존 프로세스 종료
             echo "========================================="
@@ -223,7 +228,7 @@ jobs:
             fi
           
             # start.sh 실행 권한 부여
-            chmod +x ~/koraveler-back/koraveler/start.sh
+            chmod +x ~/koraveler-back/start.sh
           
             # 스크립트 실행
             echo "========================================="
@@ -235,8 +240,8 @@ jobs:
             sleep 10
           
             # PID 파일과 프로세스 확인
-            if [ -f ~/koraveler-back/koraveler/app.pid ]; then
-              PID=\$(cat ~/koraveler-back/koraveler/app.pid)
+            if [ -f ~/koraveler-back/app.pid ]; then
+              PID=\$(cat ~/koraveler-back/app.pid)
               if ps -p \$PID > /dev/null 2>&1; then
                 echo "========================================="
                 echo "✅ Application started successfully!"
@@ -261,7 +266,7 @@ jobs:
           
                 echo ""
                 echo "Recent application logs:"
-                tail -n 20 ~/koraveler-back/koraveler/logs/koraveler.log || echo "Log file not available yet"
+                tail -n 20 ~/koraveler-back/logs/koraveler.log || echo "Log file not available yet"
           
                 echo ""
                 echo "========================================="
@@ -269,13 +274,13 @@ jobs:
                 echo "========================================="
               else
                 echo "❌ Process died immediately after starting!"
-                tail -n 50 ~/koraveler-back/koraveler/logs/koraveler.log 2>/dev/null || echo "No logs available"
+                tail -n 50 ~/koraveler-back/logs/koraveler.log 2>/dev/null || echo "No logs available"
                 exit 1
               fi
             else
               echo "❌ PID file not created - application failed to start!"
-              if [ -f ~/koraveler-back/koraveler/logs/koraveler.log ]; then
-                tail -n 50 ~/koraveler-back/koraveler/logs/koraveler.log
+              if [ -f ~/koraveler-back/logs/koraveler.log ]; then
+                tail -n 50 ~/koraveler-back/logs/koraveler.log
               fi
               exit 1
             fi
