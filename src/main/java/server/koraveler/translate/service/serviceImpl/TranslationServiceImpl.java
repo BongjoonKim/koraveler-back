@@ -4,22 +4,26 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.client.RestTemplate;
 import server.koraveler.translate.dto.*;
 import server.koraveler.translate.model.entities.TranslationHistory;
 import server.koraveler.translate.model.enums.ExportFormat;
 import server.koraveler.translate.repo.TranslationHistoryCustomRepo;
 import server.koraveler.translate.repo.TranslationHistoryRepo;
 import server.koraveler.translate.service.TranslationService;
+import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
+import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
+import software.amazon.awssdk.regions.Region;
+import software.amazon.awssdk.services.bedrockruntime.BedrockRuntimeClient;
+import software.amazon.awssdk.services.bedrockruntime.model.ContentBlock;
+import software.amazon.awssdk.services.bedrockruntime.model.ConversationRole;
+import software.amazon.awssdk.services.bedrockruntime.model.ConverseRequest;
+import software.amazon.awssdk.services.bedrockruntime.model.ConverseResponse;
+import software.amazon.awssdk.services.bedrockruntime.model.Message;
+import software.amazon.awssdk.services.bedrockruntime.model.SystemContentBlock;
 
 import java.io.ByteArrayOutputStream;
 import java.io.OutputStreamWriter;
@@ -37,34 +41,29 @@ public class TranslationServiceImpl implements TranslationService {
 
     private final TranslationHistoryRepo translationHistoryRepo;
     private final TranslationHistoryCustomRepo translationHistoryCustomRepo;
-    private final RestTemplate restTemplate = new RestTemplate();
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    @Value("${spring.openai.url}")
-    private String openAiUrl;
+    @Value("${cloud.aws.credentials.access-key}")
+    private String awsAccessKey;
 
-    @Value("${spring.openai.key}")
-    private String openAiKey;
+    @Value("${cloud.aws.credentials.secret-key}")
+    private String awsSecretKey;
 
-    @Value("${spring.openai.translation.model}")
-    private String translationModel;
+    @Value("${cloud.aws.region.static}")
+    private String awsRegion;
 
-    @Value("${spring.openai.translation.cache.enabled}")
-    private boolean cacheEnabled;
+    @Value("${cloud.aws.bedrock.model-id}")
+    private String bedrockModelId;
 
     @Override
-    @Cacheable(value = "translations",
-            key = "#request.sourceText + '_' + #request.sourceLanguage + '_' + #request.targetLanguage",
-            condition = "#request.useCache == true && @translationServiceImpl.cacheEnabled")
     public TranslationResponse translate(String userId, TranslationRequest request) {
         log.info("Translating text for user: {}, from {} to {}", userId,
                 request.getSourceLanguage(), request.getTargetLanguage());
 
         TranslationResponse response;
-        boolean fromCache = false;
 
-        // 캐시 확인 및 중복 체크
-        if (cacheEnabled && Boolean.TRUE.equals(request.getUseCache())) {
+        // 중복 체크 - 최근 동일 번역이 있으면 재사용
+        if (Boolean.TRUE.equals(request.getUseCache())) {
             TranslationHistory duplicate = checkDuplicateTranslation(
                     userId,
                     request.getSourceText(),
@@ -73,7 +72,7 @@ public class TranslationServiceImpl implements TranslationService {
             );
 
             if (duplicate != null) {
-                log.info("Found cached translation for user: {}", userId);
+                log.info("Found existing translation for user: {}", userId);
                 response = TranslationResponse.builder()
                         .id(duplicate.getId())
                         .sourceText(duplicate.getSourceText())
@@ -89,8 +88,8 @@ public class TranslationServiceImpl implements TranslationService {
             }
         }
 
-        // OpenAI API 호출하여 번역 및 발음 받기
-        TranslationWithPronunciation result = callOpenAiApiWithPronunciation(request);
+        // AWS Bedrock API 호출하여 번역 및 발음 받기
+        TranslationWithPronunciation result = callBedrockApiWithPronunciation(request);
 
         // 번역 이력 저장
         TranslationHistory history = TranslationHistory.builder()
@@ -115,7 +114,7 @@ public class TranslationServiceImpl implements TranslationService {
                 .sourceLanguage(savedHistory.getSourceLanguage())
                 .targetLanguage(savedHistory.getTargetLanguage())
                 .translatedAt(savedHistory.getCreated())
-                .fromCache(fromCache)
+                .fromCache(false)
                 .isLiked(savedHistory.isLiked())
                 .pronunciation(savedHistory.getPronunciation())
                 .build();
@@ -123,19 +122,16 @@ public class TranslationServiceImpl implements TranslationService {
         return response;
     }
 
-    private TranslationWithPronunciation callOpenAiApiWithPronunciation(TranslationRequest request) {
+    private TranslationWithPronunciation callBedrockApiWithPronunciation(TranslationRequest request) {
         try {
-            HttpHeaders headers = new HttpHeaders();
-            headers.set("Authorization", "Bearer " + openAiKey);
-            headers.set("Content-Type", "application/json");
+            BedrockRuntimeClient bedrockClient = BedrockRuntimeClient.builder()
+                    .region(Region.of(awsRegion))
+                    .credentialsProvider(StaticCredentialsProvider.create(
+                            AwsBasicCredentials.create(awsAccessKey, awsSecretKey)
+                    ))
+                    .build();
 
-            Map<String, Object> requestBody = new HashMap<>();
-            requestBody.put("model", translationModel);
-
-            List<Map<String, String>> messages = new ArrayList<>();
-            Map<String, String> systemMessage = new HashMap<>();
-            systemMessage.put("role", "system");
-            systemMessage.put("content", String.format(
+            String systemPrompt = String.format(
                     "You are a professional translator. Translate the following text from %s to %s. " +
                             "Additionally, provide a romanized pronunciation guide (using Latin alphabet) for the translated text. " +
                             "Respond ONLY in this JSON format without any markdown or code blocks:\n" +
@@ -144,54 +140,34 @@ public class TranslationServiceImpl implements TranslationService {
                     getLanguageName(request.getSourceLanguage()),
                     getLanguageName(request.getTargetLanguage()),
                     request.getContext() != null ? request.getContext() : "general"
-            ));
-            messages.add(systemMessage);
-
-            Map<String, String> userMessage = new HashMap<>();
-            userMessage.put("role", "user");
-            userMessage.put("content", request.getSourceText());
-            messages.add(userMessage);
-
-            requestBody.put("messages", messages);
-            requestBody.put("temperature", 1);
-            requestBody.put("max_completion_tokens", 2000);
-
-            HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
-
-            ResponseEntity<Map> response = restTemplate.exchange(
-                    openAiUrl,
-                    HttpMethod.POST,
-                    entity,
-                    Map.class
             );
 
-            Map<String, Object> responseBody = response.getBody();
-            if (responseBody != null && responseBody.containsKey("choices")) {
-                List<Map<String, Object>> choices = (List<Map<String, Object>>) responseBody.get("choices");
-                if (!choices.isEmpty()) {
-                    Map<String, Object> choice = choices.get(0);
-                    Map<String, String> message = (Map<String, String>) choice.get("message");
-                    String content = message.get("content").trim();
+            ConverseRequest converseRequest = ConverseRequest.builder()
+                    .modelId(bedrockModelId)
+                    .system(SystemContentBlock.builder().text(systemPrompt).build())
+                    .messages(Message.builder()
+                            .role(ConversationRole.USER)
+                            .content(ContentBlock.fromText(request.getSourceText()))
+                            .build())
+                    .build();
 
-                    // JSON 파싱
-                    try {
-                        Map<String, String> translationResult = objectMapper.readValue(content, Map.class);
-                        return new TranslationWithPronunciation(
-                                translationResult.get("translation"),
-                                translationResult.get("pronunciation")
-                        );
-                    } catch (Exception e) {
-                        log.warn("Failed to parse JSON response, using fallback", e);
-                        // JSON 파싱 실패 시 전체를 번역으로 처리
-                        return new TranslationWithPronunciation(content, null);
-                    }
-                }
+            ConverseResponse converseResponse = bedrockClient.converse(converseRequest);
+
+            String content = converseResponse.output().message().content().get(0).text().trim();
+
+            try {
+                Map<String, String> translationResult = objectMapper.readValue(content, Map.class);
+                return new TranslationWithPronunciation(
+                        translationResult.get("translation"),
+                        translationResult.get("pronunciation")
+                );
+            } catch (Exception e) {
+                log.warn("Failed to parse JSON response, using fallback", e);
+                return new TranslationWithPronunciation(content, null);
             }
 
-            throw new RuntimeException("Failed to get translation from OpenAI");
-
         } catch (Exception e) {
-            log.error("Error calling OpenAI API: ", e);
+            log.error("Error calling AWS Bedrock API: ", e);
             return new TranslationWithPronunciation(
                     "Translation failed: " + e.getMessage(),
                     null

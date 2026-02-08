@@ -40,6 +40,7 @@ jobs:
           REDIS_HOST: ${{secrets.REDIS_HOST}}
           AWS_ACCESS_KEY: ${{ secrets.AWS_ACCESS_KEY }}
           AWS_SECRET_KEY: ${{ secrets.AWS_SECRET_KEY }}
+          AWS_BEDROCK_MODEL_ID: ${{ secrets.AWS_BEDROCK_MODEL_ID }}
         run: |
           # SSH 키 설정
           echo "$PRIVATE_KEY" > private_key.pem
@@ -166,6 +167,8 @@ jobs:
                 secret-key: ${AWS_SECRET_KEY}
               region:
                 static: ap-northeast-2
+              bedrock:
+                model-id: ${AWS_BEDROCK_MODEL_ID}
 
           # 액추에이터 설정 (헬스체크용)
           management:

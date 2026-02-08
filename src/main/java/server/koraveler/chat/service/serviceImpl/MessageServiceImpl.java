@@ -1,6 +1,5 @@
 package server.koraveler.chat.service.serviceImpl;
 
-import kotlin.collections.ArrayDeque;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
