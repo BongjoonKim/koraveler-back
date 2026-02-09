@@ -29,14 +29,7 @@ public class CorsConfig {
         allowedOriginPatterns.add(frontLocalUrl);
         allowedOriginPatterns.add(frontProdUrl);
         allowedOriginPatterns.add("https://www.koraveler.com");
-        allowedOriginPatterns.add("www.koraveler.com");
-        allowedOriginPatterns.add("https://www.koraveler.com/");
-        allowedOriginPatterns.add("www.koraveler.com/");
-        allowedOriginPatterns.add("https://www.koraveler.com:3002");
-        allowedOriginPatterns.add("www.koraveler.com:3002");
-        allowedOriginPatterns.add("https://www.koraveler.com:3002/");
-        allowedOriginPatterns.add("www.koraveler.com:3002/");
-        configuration.setAllowedOrigins(allowedOriginPatterns);
+        configuration.setAllowedOriginPatterns(allowedOriginPatterns);
 
         //허용하는 HTTP METHOD 지정
         // OPTIONS 메서드 포함
