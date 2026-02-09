@@ -48,6 +48,9 @@ public class PlaceSearchServiceImpl implements PlaceSearchService {
     @Value("${spring.naver.map.client-secret}")
     private String naverClientSecret;
 
+    @Value("${cloud.aws.bedrock.model-id}")
+    private String bedrockModelId;
+
     // ========================================================================
     // 검색 메인 로직
     // ========================================================================
@@ -207,7 +210,7 @@ public class PlaceSearchServiceImpl implements PlaceSearchService {
             ));
 
             InvokeModelRequest request = InvokeModelRequest.builder()
-                    .modelId("anthropic.claude-3-haiku-20240307-v1:0")
+                    .modelId(bedrockModelId)
                     .contentType("application/json")
                     .accept("application/json")
                     .body(SdkBytes.fromUtf8String(requestBody))
