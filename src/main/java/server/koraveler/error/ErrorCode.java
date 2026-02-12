@@ -76,6 +76,7 @@ public enum ErrorCode {
     INVALID_TRAVEL_DATE(HttpStatus.BAD_REQUEST, "TRV_011", "여행 날짜가 올바르지 않습니다"),
     INVALID_MEDIA_TYPE(HttpStatus.BAD_REQUEST, "TRV_012", "사진 또는 영상 파일만 업로드 가능합니다"),
     S3_UPLOAD_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "TRV_013", "파일 업로드에 실패했습니다"),
+    S3_DOWNLOAD_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "TRV_014", "파일 다운로드에 실패했습니다"),
 
     // ============= 일반 에러 (GEN) =============
     INVALID_INPUT(HttpStatus.BAD_REQUEST, "GEN_001", "Invalid input / 잘못된 입력값입니다"),

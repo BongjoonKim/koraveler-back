@@ -3,6 +3,9 @@ package server.koraveler.travel.controller;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.io.Resource;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
@@ -13,6 +16,8 @@ import server.koraveler.travel.model.enums.TravelRole;
 import server.koraveler.travel.service.TravelService;
 import server.koraveler.users.dto.CustomUserDetails;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 @Slf4j
@@ -186,5 +191,42 @@ public class TravelController {
             @AuthenticationPrincipal CustomUserDetails userDetails) {
         travelService.deleteMedia(travelId, mediaId, userDetails.getUsername());
         return ResponseEntity.noContent().build();
+    }
+
+    // ==================== Media Download ====================
+
+    @GetMapping("/{travelId}/media/{mediaId}/download")
+    public ResponseEntity<Resource> downloadMedia(
+            @PathVariable String travelId,
+            @PathVariable String mediaId,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        TravelMedia media = travelService.getMediaInfo(travelId, mediaId, userDetails.getUsername());
+        Resource resource = travelService.downloadMedia(travelId, mediaId, userDetails.getUsername());
+
+        String encodedFileName = URLEncoder.encode(
+                media.getOriginalFileName() != null ? media.getOriginalFileName() : media.getFileName(),
+                StandardCharsets.UTF_8
+        ).replace("+", "%20");
+
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(media.getMimeType()))
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename*=UTF-8''" + encodedFileName)
+                .body(resource);
+    }
+
+    @PostMapping("/{travelId}/media/download")
+    public ResponseEntity<Resource> downloadMediaBatch(
+            @PathVariable String travelId,
+            @Valid @RequestBody MediaDownloadRequest request,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        Resource resource = travelService.downloadMediaBatch(
+                travelId, request.getMediaIds(), userDetails.getUsername());
+
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType("application/zip"))
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=\"travel-media.zip\"")
+                .body(resource);
     }
 }
