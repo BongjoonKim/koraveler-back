@@ -14,6 +14,8 @@ import org.springframework.transaction.annotation.Transactional;
 import server.koraveler.chat.model.entities.ChannelMembers;
 import server.koraveler.chat.model.enums.MemberStatus;
 import server.koraveler.chat.repository.ChannelMembersRepo;
+import server.koraveler.travel.model.entities.TravelUsers;
+import server.koraveler.travel.repo.TravelUsersRepo;
 import server.koraveler.error.CustomException;
 import server.koraveler.users.dto.CustomUserDetails;
 import server.koraveler.users.dto.response.UserResponse;
@@ -35,6 +37,7 @@ public class UserSearchServiceImpl implements UserSearchService {
 
     private final UsersRepo usersRepo;
     private final ChannelMembersRepo channelMembersRepo;
+    private final TravelUsersRepo travelUsersRepo;
 
     @Override
     public UserSearchResponse searchUsers(String keyword, String excludeChannelId, Integer size, String currentUserId) {
@@ -131,7 +134,7 @@ public class UserSearchServiceImpl implements UserSearchService {
             // 키워드로 필터링
             searchResults = eligibleUsers.stream()
                     .filter(user ->
-                            user.getUserId().toLowerCase().contains(trimmedKeyword.toLowerCase()) ||
+                            (user.getUserId() != null && user.getUserId().toLowerCase().contains(trimmedKeyword.toLowerCase())) ||
                                     (user.getName() != null && user.getName().toLowerCase().contains(trimmedKeyword.toLowerCase())) ||
                                     (user.getEmail() != null && user.getEmail().toLowerCase().contains(trimmedKeyword.toLowerCase()))
                     )
@@ -140,6 +143,66 @@ public class UserSearchServiceImpl implements UserSearchService {
         }
 
         // Response 변환
+        List<UserResponse> userResponses = searchResults.stream()
+                .map(this::toUserResponse)
+                .collect(Collectors.toList());
+
+        return UserSearchResponse.builder()
+                .users(userResponses)
+                .totalCount(userResponses.size())
+                .hasNext(false)
+                .build();
+    }
+
+    @Override
+    public UserSearchResponse searchUsersNotInTravel(String keyword, String travelId, Integer size, String currentUserId) {
+        log.info("Searching users not in travel: {} with keyword: {}", travelId, keyword);
+
+        // 키워드가 너무 짧으면 빈 결과 반환
+        if (keyword == null || keyword.trim().length() < 2) {
+            return UserSearchResponse.builder()
+                    .users(new ArrayList<>())
+                    .totalCount(0)
+                    .hasNext(false)
+                    .build();
+        }
+
+        String trimmedKeyword = keyword.trim();
+
+        // 여행 프로젝트의 현재 멤버 목록 가져오기
+        List<TravelUsers> travelMembers = travelUsersRepo.findByTravelId(travelId);
+
+        List<String> memberUserIds = travelMembers.stream()
+                .map(TravelUsers::getUserId)
+                .collect(Collectors.toList());
+
+        // 현재 사용자도 제외 리스트에 추가
+        if (!memberUserIds.contains(currentUserId)) {
+            memberUserIds.add(currentUserId);
+        }
+
+        // 활성 사용자 중에서 검색
+        List<Users> searchResults;
+
+        if (memberUserIds.isEmpty()) {
+            Pageable pageable = PageRequest.of(0, size);
+            Page<Users> searchPage = usersRepo.findByIsEnabledTrueAndUserIdContainingIgnoreCaseOrIsEnabledTrueAndNameContainingIgnoreCaseOrIsEnabledTrueAndEmailContainingIgnoreCase(
+                    trimmedKeyword, trimmedKeyword, trimmedKeyword, pageable);
+            searchResults = searchPage.getContent();
+        } else {
+            // 여행 멤버를 제외하고 검색
+            List<Users> eligibleUsers = usersRepo.findByIsEnabledTrueAndUserIdNotIn(memberUserIds);
+
+            searchResults = eligibleUsers.stream()
+                    .filter(user ->
+                            (user.getUserId() != null && user.getUserId().toLowerCase().contains(trimmedKeyword.toLowerCase())) ||
+                                    (user.getName() != null && user.getName().toLowerCase().contains(trimmedKeyword.toLowerCase())) ||
+                                    (user.getEmail() != null && user.getEmail().toLowerCase().contains(trimmedKeyword.toLowerCase()))
+                    )
+                    .limit(size)
+                    .collect(Collectors.toList());
+        }
+
         List<UserResponse> userResponses = searchResults.stream()
                 .map(this::toUserResponse)
                 .collect(Collectors.toList());

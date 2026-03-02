@@ -60,6 +60,24 @@ public class UserSearchController {
     }
 
     /**
+     * 여행 프로젝트에 없는 사용자 검색
+     */
+    @GetMapping("/search/available-for-travel")
+    public ResponseEntity<UserSearchResponse> searchUsersNotInTravel(
+            @RequestParam String keyword,
+            @RequestParam String travelId,
+            @RequestParam(defaultValue = "20") Integer size,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+
+        log.info("Searching available users for travel: {} with keyword: {}", travelId, keyword);
+
+        UserSearchResponse response = userSearchService.searchUsersNotInTravel(
+                keyword, travelId, size, userDetails.getUsername());
+
+        return ResponseEntity.ok(response);
+    }
+
+    /**
      * 특정 사용자 정보 조회
      */
     @GetMapping("/{userId}")
