@@ -38,6 +38,17 @@ src/main/java/server/koraveler/
 │   ├── service/
 │   ├── controller/
 │   └── component/              # JWT Filter 등
+├── travel/
+│   ├── model/
+│   │   ├── entities/           # Travels, TravelUsers, TravelMedia
+│   │   ├── dto/                # Request/Response DTO
+│   │   ├── enums/              # TravelRole, TravelStatus, TravelVisibility
+│   │   ├── embedded/           # TravelSchedule (내장 문서)
+│   │   └── mapper/             # TravelMapper
+│   ├── repo/                   # TravelsRepo, TravelUsersRepo, TravelMediaRepo
+│   ├── service/
+│   │   └── serviceImpl/        # TravelServiceImpl
+│   └── controller/             # TravelController
 ├── connections/                # 연결 관계 (북마크 등)
 ├── utils/                      # 유틸리티 (JwtUtil 등)
 └── error/                      # 예외 처리
@@ -670,3 +681,96 @@ try {
             .body("수정 실패: " + e.getMessage());
 }
 ```
+
+---
+
+## 11. Travel (여행 프로젝트) 모듈
+
+### 11.1 개요
+여행 계획을 그룹으로 관리하는 기능. 멤버 초대, 일정 관리, 채널 연결, 미디어 업로드 지원.
+Base Path: `/api/v1/travels` (모든 API 인증 필수)
+
+### 11.2 Enum
+```java
+public enum TravelVisibility { PUBLIC, PRIVATE }
+public enum TravelStatus { PLANNING, IN_PROGRESS, COMPLETED, CANCELLED }
+public enum TravelRole { ADMIN, USER }
+```
+
+### 11.3 Entity 구조
+
+**Travels** (collection: `travels`) - CommonDTO 상속
+- `id`, `title`, `description`, `coverImageUrl`
+- `visibility` (TravelVisibility), `status` (TravelStatus)
+- `startDate`, `endDate` (LocalDate), `destination`
+- `tags` (List<String>)
+- `schedules` (List<TravelSchedule>) — 내장 문서
+- `channelIds` (List<String>)
+
+**TravelUsers** (collection: `travel_users`) - CommonDTO 상속
+- `id`, `travelId` (@Indexed), `userId` (@Indexed)
+- `role` (TravelRole), `nickname`, `joinedAt` (LocalDateTime)
+
+**TravelMedia** (collection: `travel_media`) - CommonDTO 상속
+- `id`, `travelId` (@Indexed), `uploadUserId`
+- `fileName`, `originalFileName`, `fileUrl`, `thumbnailUrl`
+- `mimeType`, `fileSize` (Long), `width`, `height`, `duration` (Integer)
+- `description`, `takenAt` (LocalDateTime)
+
+**TravelSchedule** (내장 문서, 별도 컬렉션 없음)
+- `id`, `dayNumber` (Integer), `date` (LocalDate)
+- `title`, `description`, `sortOrder` (Integer)
+- `places` (List<SchedulePlace>)
+  - SchedulePlace: `name`, `address`, `lat` (Double), `lng` (Double), `memo`
+
+### 11.4 DTO
+
+**TravelCreateRequest** — title 필수(max 100), description(max 2000), coverImageUrl, visibility, startDate, endDate, destination, tags
+**TravelUpdateRequest** — title(max 100), description(max 2000), coverImageUrl, visibility, status, startDate, endDate, destination, tags
+**TravelMemberRequest** — userId 필수, role, nickname
+**TravelScheduleRequest** — title 필수, dayNumber, date, description, places, sortOrder
+**TravelMediaRequest** — description, width, height, duration, takenAt
+
+**TravelResponse** — 전체 Travel 정보 + members(List<TravelMemberResponse>) + memberCount
+**TravelListResponse** — travels(List<TravelResponse>) + pagination(totalCount, pageSize, currentPage, hasMore)
+
+### 11.5 Mapper
+`TravelMapper` (@Component)로 Entity ↔ Response 변환. 생성 시 visibility 미입력이면 PRIVATE, status는 PLANNING 기본값.
+
+### 11.6 Controller 엔드포인트
+```
+# 여행 CRUD
+POST   /api/v1/travels                                    → 생성
+GET    /api/v1/travels/{travelId}                         → 상세 조회
+PUT    /api/v1/travels/{travelId}                         → 수정
+DELETE /api/v1/travels/{travelId}                         → 삭제 (204)
+
+# 목록
+GET    /api/v1/travels/my?page=0&size=10                  → 내 여행 목록
+GET    /api/v1/travels/public?page=0&size=10              → 공개 여행 목록
+
+# 멤버
+POST   /api/v1/travels/{travelId}/members                 → 멤버 추가
+DELETE /api/v1/travels/{travelId}/members/{userId}        → 멤버 제거 (204)
+PUT    /api/v1/travels/{travelId}/members/{userId}/role?role=ADMIN → 역할 변경
+
+# 일정
+POST   /api/v1/travels/{travelId}/schedules               → 일정 추가
+PUT    /api/v1/travels/{travelId}/schedules/{scheduleId}  → 일정 수정
+DELETE /api/v1/travels/{travelId}/schedules/{scheduleId}  → 일정 삭제 (204)
+
+# 채널 연결
+POST   /api/v1/travels/{travelId}/channels/{channelId}    → 채널 연결
+DELETE /api/v1/travels/{travelId}/channels/{channelId}    → 채널 해제 (204)
+
+# 미디어
+POST   /api/v1/travels/{travelId}/media                   → 업로드 (multipart/form-data)
+GET    /api/v1/travels/{travelId}/media?page=0&size=20    → 목록 조회
+DELETE /api/v1/travels/{travelId}/media/{mediaId}         → 삭제 (204)
+```
+
+### 11.7 참고 사항
+- 미디어 업로드는 `multipart/form-data` 형식: `file` (필수) + `request` (선택, JSON 메타데이터)
+- S3Service를 통해 파일 업로드 처리
+- 여행 생성자는 자동으로 ADMIN 역할 멤버로 등록됨
+- TravelSchedule은 Travels 문서 내 내장 배열 (별도 컬렉션이 아님)

@@ -27,6 +27,16 @@ public interface UserSearchService {
     UserSearchResponse searchUsersNotInChannel(String keyword, String channelId, Integer size, String currentUserId);
 
     /**
+     * 여행 프로젝트에 없는 사용자 검색
+     * @param keyword 검색 키워드
+     * @param travelId 여행 프로젝트 ID
+     * @param size 결과 개수
+     * @param currentUserId 현재 사용자 ID
+     * @return 검색 결과
+     */
+    UserSearchResponse searchUsersNotInTravel(String keyword, String travelId, Integer size, String currentUserId);
+
+    /**
      * 특정 사용자 정보 조회
      * @param userId 사용자 ID
      * @return 사용자 정보

@@ -62,6 +62,22 @@ public enum ErrorCode {
     TRANSLATION_GROUP_NOT_FOUND(HttpStatus.NOT_FOUND, "TRANS_010", "번역 그룹을 찾을 수 없습니다"),
     TRANSLATION_HISTORY_LIMIT(HttpStatus.BAD_REQUEST, "TRANS_011", "번역 히스토리 제한 초과"),
 
+    // ============= 여행 관련 에러 (TRV) =============
+    TRAVEL_NOT_FOUND(HttpStatus.NOT_FOUND, "TRV_001", "여행 프로젝트를 찾을 수 없습니다"),
+    UNAUTHORIZED_TRAVEL_ACCESS(HttpStatus.FORBIDDEN, "TRV_002", "여행 프로젝트 접근 권한이 없습니다"),
+    UNAUTHORIZED_TRAVEL_UPDATE(HttpStatus.FORBIDDEN, "TRV_003", "여행 프로젝트 수정 권한이 없습니다"),
+    UNAUTHORIZED_TRAVEL_DELETE(HttpStatus.FORBIDDEN, "TRV_004", "여행 프로젝트 삭제 권한이 없습니다"),
+    ALREADY_TRAVEL_MEMBER(HttpStatus.CONFLICT, "TRV_005", "이미 여행 멤버입니다"),
+    NOT_TRAVEL_MEMBER(HttpStatus.NOT_FOUND, "TRV_006", "여행 멤버가 아닙니다"),
+    UNAUTHORIZED_MEMBER_MANAGE(HttpStatus.FORBIDDEN, "TRV_007", "멤버 관리 권한이 없습니다"),
+    CANNOT_REMOVE_LAST_ADMIN(HttpStatus.BAD_REQUEST, "TRV_008", "마지막 관리자는 삭제할 수 없습니다"),
+    TRAVEL_MEDIA_NOT_FOUND(HttpStatus.NOT_FOUND, "TRV_009", "미디어를 찾을 수 없습니다"),
+    TRAVEL_SCHEDULE_NOT_FOUND(HttpStatus.NOT_FOUND, "TRV_010", "일정을 찾을 수 없습니다"),
+    INVALID_TRAVEL_DATE(HttpStatus.BAD_REQUEST, "TRV_011", "여행 날짜가 올바르지 않습니다"),
+    INVALID_MEDIA_TYPE(HttpStatus.BAD_REQUEST, "TRV_012", "사진 또는 영상 파일만 업로드 가능합니다"),
+    S3_UPLOAD_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "TRV_013", "파일 업로드에 실패했습니다"),
+    S3_DOWNLOAD_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "TRV_014", "파일 다운로드에 실패했습니다"),
+
     // ============= 일반 에러 (GEN) =============
     INVALID_INPUT(HttpStatus.BAD_REQUEST, "GEN_001", "Invalid input / 잘못된 입력값입니다"),
     NOT_FOUND(HttpStatus.NOT_FOUND, "GEN_002", "Resource not found"),
