@@ -3,6 +3,7 @@ package server.koraveler;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.data.mongodb.repository.config.EnableMongoRepositories;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 //@EnableElasticsearchRepositories("server.koraveler.blog.elastic")
 //@EnableMongoRepositories(basePackages = {
@@ -13,6 +14,7 @@ import org.springframework.data.mongodb.repository.config.EnableMongoRepositorie
 //        "server.koraveler.folders.repo"
 //})
 @SpringBootApplication
+@EnableScheduling
 public class KoravelerApplication {
 
     public static void main(String[] args) {
