@@ -29,15 +29,17 @@ public class TranslationWorker {
 
         if (jobs.isEmpty()) return;
 
-        log.debug("번역 작업 {} 건 처리 시작", jobs.size());
+        log.info("번역 Worker: QUEUED 작업 {} 건 감지, 처리 시작", jobs.size());
 
         for (TranslationJob job : jobs) {
             try {
                 i18nTranslationService.processJob(job);
             } catch (Exception e) {
-                log.error("번역 작업 처리 중 예상치 못한 에러: jobId={}, error={}",
-                        job.getId(), e.getMessage());
+                log.error("번역 Worker: 예상치 못한 에러 발생 - jobId={}, postId={}, locale={}, error={}",
+                        job.getId(), job.getPostId(), job.getTargetLocale(), e.getMessage(), e);
             }
         }
+
+        log.info("번역 Worker: {} 건 처리 완료", jobs.size());
     }
 }

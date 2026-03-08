@@ -1,5 +1,6 @@
 package server.koraveler.i18n.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -16,7 +17,10 @@ public class TranslatedPostDTO {
     private String id;
     private String originalLocale;
     private String currentLocale;
+
+    @JsonProperty("isTranslated")
     private boolean isTranslated;
+
     private String translatedBy;  // "ai" | "human" | "ai+human" | null
     private String title;
     private String content;

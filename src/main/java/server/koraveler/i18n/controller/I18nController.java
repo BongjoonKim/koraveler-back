@@ -126,16 +126,19 @@ public class I18nController {
             @RequestBody(required = false) RetranslateRequestDTO request,
             @AuthenticationPrincipal CustomUserDetails userDetails
     ) {
+        log.info("[I18n] 재번역 API 호출: postId={}, locale={}, userId={}", postId, locale, userDetails.getUsername());
         try {
             boolean confirmed = request != null && request.isConfirmed();
             RetranslateResponseDTO result = i18nTranslationService.retranslate(postId, locale, confirmed);
 
             if (result.isRequiresConfirmation()) {
+                log.info("[I18n] 수동 편집 확인 필요 응답: postId={}, locale={}", postId, locale);
                 return ResponseEntity.ok(result);
             }
+            log.info("[I18n] 재번역 큐잉 성공 응답(202): postId={}, locale={}", postId, locale);
             return ResponseEntity.accepted().body(result);
         } catch (Exception e) {
-            log.error("재번역 요청 실패: postId={}, locale={}", postId, locale, e);
+            log.error("[I18n] 재번역 요청 실패: postId={}, locale={}", postId, locale, e);
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                     .body("Retranslate failed: " + e.getMessage());
         }
@@ -149,11 +152,13 @@ public class I18nController {
             @PathVariable String postId,
             @AuthenticationPrincipal CustomUserDetails userDetails
     ) {
+        log.info("[I18n] 전체 재번역 API 호출: postId={}, userId={}", postId, userDetails.getUsername());
         try {
             i18nTranslationService.retranslateAll(postId);
+            log.info("[I18n] 전체 재번역 큐잉 성공 응답(202): postId={}", postId);
             return ResponseEntity.accepted().build();
         } catch (Exception e) {
-            log.error("전체 재번역 요청 실패: postId={}", postId, e);
+            log.error("[I18n] 전체 재번역 요청 실패: postId={}", postId, e);
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                     .body("Retranslate all failed: " + e.getMessage());
         }

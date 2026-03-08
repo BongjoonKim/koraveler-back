@@ -91,6 +91,8 @@ public class I18nTranslationServiceImpl implements I18nTranslationService {
 
     @Override
     public void processJob(TranslationJob job) {
+        log.info("번역 작업 처리 시작: jobId={}, postId={}, locale={}", job.getId(), job.getPostId(), job.getTargetLocale());
+
         job.setStatus(JobStatus.PROCESSING);
         job.setStartedAt(LocalDateTime.now());
         translationJobRepo.save(job);
@@ -100,6 +102,10 @@ public class I18nTranslationServiceImpl implements I18nTranslationService {
                     .orElseThrow(() -> new RuntimeException("Post not found: " + job.getPostId()));
 
             String originalLocale = post.getOriginalLocale() != null ? post.getOriginalLocale() : "ko";
+
+            int contentLength = post.getContents() != null ? post.getContents().length() : 0;
+            log.info("Bedrock 번역 API 호출: postId={}, locale={}, 원문 제목={}, 콘텐츠 크기={}자",
+                    job.getPostId(), job.getTargetLocale(), post.getTitle(), contentLength);
 
             BedrockPostTranslationClient.TranslationResult result = bedrockClient.translate(
                     post.getTitle(),
@@ -332,12 +338,15 @@ public class I18nTranslationServiceImpl implements I18nTranslationService {
 
     @Override
     public RetranslateResponseDTO retranslate(String postId, String locale, boolean confirmed) {
+        log.info("재번역 요청 수신: postId={}, locale={}, confirmed={}", postId, locale, confirmed);
+
         Optional<PostTranslation> existing = postTranslationRepo.findByPostIdAndLocale(postId, locale);
 
         // 수동 편집된 번역이면 확인 필요
         if (existing.isPresent()
                 && existing.get().getTranslatedBy() == TranslatedBy.AI_HUMAN
                 && !confirmed) {
+            log.info("수동 편집 번역 확인 필요: postId={}, locale={}", postId, locale);
             return RetranslateResponseDTO.builder()
                     .warning("This translation has been manually edited. Re-translating will overwrite your changes.")
                     .requiresConfirmation(true)
@@ -365,6 +374,8 @@ public class I18nTranslationServiceImpl implements I18nTranslationService {
                 .build();
         translationJobRepo.save(job);
 
+        log.info("재번역 Job 큐잉 완료: postId={}, locale={}, jobId={}", postId, locale, job.getId());
+
         return RetranslateResponseDTO.builder()
                 .requiresConfirmation(false)
                 .build();
@@ -372,11 +383,14 @@ public class I18nTranslationServiceImpl implements I18nTranslationService {
 
     @Override
     public void retranslateAll(String postId) {
+        log.info("전체 재번역 요청 수신: postId={}", postId);
+
         Documents post = blogsRepo.findById(postId)
                 .orElseThrow(() -> new RuntimeException("Post not found: " + postId));
 
         String originalLocale = post.getOriginalLocale() != null ? post.getOriginalLocale() : "ko";
         LocalDateTime now = LocalDateTime.now();
+        int queuedCount = 0;
 
         for (String targetLocale : TARGET_LOCALES) {
             if (targetLocale.equals(originalLocale)) continue;
@@ -399,7 +413,10 @@ public class I18nTranslationServiceImpl implements I18nTranslationService {
                     .createdAt(now)
                     .build();
             translationJobRepo.save(job);
+            queuedCount++;
         }
+
+        log.info("전체 재번역 Job 큐잉 완료: postId={}, 큐잉된 언어 수={}", postId, queuedCount);
     }
 
     @Override

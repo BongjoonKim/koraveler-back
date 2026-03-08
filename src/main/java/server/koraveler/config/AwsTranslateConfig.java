@@ -6,6 +6,8 @@ import org.springframework.context.annotation.Configuration;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.core.client.config.ClientOverrideConfiguration;
+import software.amazon.awssdk.core.retry.RetryPolicy;
+import software.amazon.awssdk.http.urlconnection.UrlConnectionHttpClient;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.bedrockruntime.BedrockRuntimeClient;
 import software.amazon.awssdk.services.translate.TranslateClient;
@@ -37,13 +39,20 @@ public class AwsTranslateConfig {
     @Bean
     public BedrockRuntimeClient bedrockRuntimeClient() {
         return BedrockRuntimeClient.builder()
-                .region(Region.of(region))  // Bedrock Claude는 서울 리전 지원
+                .region(Region.of(region))
                 .credentialsProvider(StaticCredentialsProvider.create(
                         AwsBasicCredentials.create(accessKey, secretKey)
                 ))
+                .httpClient(UrlConnectionHttpClient.builder()
+                        .socketTimeout(Duration.ofMinutes(3))
+                        .connectionTimeout(Duration.ofSeconds(10))
+                        .build())
                 .overrideConfiguration(ClientOverrideConfiguration.builder()
                         .apiCallTimeout(Duration.ofMinutes(5))
                         .apiCallAttemptTimeout(Duration.ofMinutes(3))
+                        .retryPolicy(RetryPolicy.builder()
+                                .numRetries(2)
+                                .build())
                         .build())
                 .build();
     }

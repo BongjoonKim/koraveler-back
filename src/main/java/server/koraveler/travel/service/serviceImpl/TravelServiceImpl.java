@@ -476,6 +476,8 @@ public class TravelServiceImpl implements TravelService {
         TravelMedia media = travelMediaRepo.findById(mediaId)
                 .orElseThrow(() -> new CustomException(ErrorCode.TRAVEL_MEDIA_NOT_FOUND));
 
+        log.info("Download fileUrl: {}, thumbnailUrl: {}, fileSize: {}", media.getFileUrl(), media.getThumbnailUrl(), media.getFileSize());
+
         ResponseInputStream<GetObjectResponse> s3Object = s3Service.downloadFile(media.getFileUrl());
         return new InputStreamResource(s3Object);
     }
