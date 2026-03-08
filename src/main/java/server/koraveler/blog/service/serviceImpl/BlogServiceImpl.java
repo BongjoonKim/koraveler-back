@@ -23,6 +23,7 @@ import server.koraveler.blog.model.Documents;
 import server.koraveler.blog.repo.BlogsRepo;
 import server.koraveler.blog.service.BlogService;
 import server.koraveler.connections.bookmarks.repo.BookmarksRepo;
+import server.koraveler.i18n.service.I18nTranslationService;
 import server.koraveler.users.model.Users;
 import server.koraveler.users.repo.UsersRepo;
 import org.bson.Document;  // 이 import 추가 필요!
@@ -48,6 +49,9 @@ public class BlogServiceImpl implements BlogService {
 
     @Autowired
     private BookmarksRepo bookmarksRepo;
+
+    @Autowired
+    private I18nTranslationService i18nTranslationService;
 
     private void testAggregationSteps(
             AggregationOperation matchDraft,
@@ -255,6 +259,15 @@ public class BlogServiceImpl implements BlogService {
                     documents.setFolderId(users.getId());
                 }
                 Documents afterDocument = blogsRepo.save(documents);
+
+                // i18n: 발행된 글(draft가 아닌)이면 자동 번역 큐잉
+                if (!afterDocument.isDraft()) {
+                    try {
+                        i18nTranslationService.queueTranslations(afterDocument);
+                    } catch (Exception e) {
+                        log.warn("번역 큐잉 실패 (글 저장은 성공): {}", e.getMessage());
+                    }
+                }
 
                 DocumentsDTO newDocDTO = new DocumentsDTO();
                 BeanUtils.copyProperties(afterDocument, newDocDTO);

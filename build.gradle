@@ -34,6 +34,7 @@ dependencies {
     implementation 'software.amazon.awssdk:translate:2.31.8'
     implementation 'software.amazon.awssdk:bedrockruntime:2.31.8'
     implementation 'software.amazon.awssdk:s3:2.31.8'
+    implementation 'software.amazon.awssdk:url-connection-client:2.31.8'
 
     //security
     implementation 'org.springframework.boot:spring-boot-starter-security'

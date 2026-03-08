@@ -27,6 +27,10 @@ public class Documents extends CommonDTO {
     private String thumbnailImgUrl;
     private boolean draft;
 
+    // i18n: 원본 언어 (기본값 "ko")
+    @Builder.Default
+    private String originalLocale = "ko";
+
     // Featured 관련 필드 추가
     private boolean featuredReady;  // Featured 가능 여부
     private FeaturedInfo featuredInfo;  // Featured 전용 정보
