@@ -23,6 +23,9 @@ import server.koraveler.blog.model.Documents;
 import server.koraveler.blog.repo.BlogsRepo;
 import server.koraveler.blog.service.BlogService;
 import server.koraveler.connections.bookmarks.repo.BookmarksRepo;
+import server.koraveler.i18n.model.entities.PostTranslation;
+import server.koraveler.i18n.model.enums.TranslationStatus;
+import server.koraveler.i18n.repo.PostTranslationRepo;
 import server.koraveler.i18n.service.I18nTranslationService;
 import server.koraveler.users.model.Users;
 import server.koraveler.users.repo.UsersRepo;
@@ -32,6 +35,7 @@ import org.bson.Document;  // 이 import 추가 필요!
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -52,6 +56,9 @@ public class BlogServiceImpl implements BlogService {
 
     @Autowired
     private I18nTranslationService i18nTranslationService;
+
+    @Autowired
+    private PostTranslationRepo postTranslationRepo;
 
     private void testAggregationSteps(
             AggregationOperation matchDraft,
@@ -397,6 +404,12 @@ public class BlogServiceImpl implements BlogService {
                 return documentDTO;
             }).collect(Collectors.toList());
 
+            // locale이 지정되고 원본 언어(ko)가 아닌 경우, 번역된 제목/내용으로 덮어쓰기
+            String locale = pageDTO.getLocale();
+            if (StringUtils.hasText(locale) && !"ko".equals(locale) && !documentsDTO.isEmpty()) {
+                applyTranslations(documentsDTO, locale);
+            }
+
             DocumentsInfo documentsInfo = new DocumentsInfo();
             documentsInfo.setDocuments(documentsDTO);
             documentsInfo.setTotalPagesCnt(documents.getTotalPages());
@@ -504,6 +517,40 @@ public class BlogServiceImpl implements BlogService {
         // Page 객체로 반환 (페이지네이션 정보와 결과 리스트)
         return new PageImpl<>(entities, pageable, total);
     };
+
+    /**
+     * 블로그 목록의 DocumentsDTO에 번역된 제목/내용을 덮어쓰기.
+     * COMPLETED 또는 MANUALLY_EDITED 상태의 번역만 적용.
+     */
+    private void applyTranslations(List<DocumentsDTO> documentsDTO, String locale) {
+        try {
+            List<String> postIds = documentsDTO.stream()
+                    .map(DocumentsDTO::getId)
+                    .collect(Collectors.toList());
+
+            List<PostTranslation> translations = postTranslationRepo.findByPostIdInAndLocaleAndStatusIn(
+                    postIds, locale,
+                    List.of(TranslationStatus.COMPLETED, TranslationStatus.MANUALLY_EDITED)
+            );
+
+            Map<String, PostTranslation> translationMap = translations.stream()
+                    .collect(Collectors.toMap(PostTranslation::getPostId, t -> t, (a, b) -> a));
+
+            for (DocumentsDTO dto : documentsDTO) {
+                PostTranslation translation = translationMap.get(dto.getId());
+                if (translation != null) {
+                    if (StringUtils.hasText(translation.getTitle())) {
+                        dto.setTitle(translation.getTitle());
+                    }
+                    if (StringUtils.hasText(translation.getSummary())) {
+                        dto.setContents(translation.getSummary());
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.warn("블로그 목록 번역 적용 실패 (원본 유지): {}", e.getMessage());
+        }
+    }
 
     @Override
     public DocumentsDTO setAsFeatured(String id, Documents.FeaturedInfo featuredInfo,

@@ -20,4 +20,8 @@ public interface PostTranslationRepo extends MongoRepository<PostTranslation, St
     boolean existsByPostIdAndLocale(String postId, String locale);
 
     void deleteByPostId(String postId);
+
+    // 여러 문서의 번역을 한번에 조회 (블로그 목록용)
+    List<PostTranslation> findByPostIdInAndLocaleAndStatusIn(
+            List<String> postIds, String locale, List<TranslationStatus> statuses);
 }

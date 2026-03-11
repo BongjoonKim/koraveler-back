@@ -69,10 +69,11 @@ public class BlogController {
             @RequestParam("page") int page,
             @RequestParam("size") int size,
             @RequestParam("folderId") String folderId,
-            @RequestParam("dateSort") String dateSort
+            @RequestParam("dateSort") String dateSort,
+            @RequestParam(value = "locale", required = false) String locale
     ) {
         try {
-            return blogService.getDocuments(new PaginationDTO(page, size, folderId, null, dateSort));
+            return blogService.getDocuments(new PaginationDTO(page, size, folderId, null, dateSort, locale));
         } catch (Exception e) {
             e.printStackTrace();
             throw new ResponseStatusException(HttpStatus.valueOf("error"), e.getMessage());
@@ -85,10 +86,11 @@ public class BlogController {
             @RequestParam("size") int size,
             @RequestParam("folderId") String folderId,
             @RequestParam("type") String type,
-            @RequestParam("dateSort") String dateSort
+            @RequestParam("dateSort") String dateSort,
+            @RequestParam(value = "locale", required = false) String locale
     ) {
         try {
-            return blogService.getDocuments(new PaginationDTO(page, size, folderId, type, dateSort));
+            return blogService.getDocuments(new PaginationDTO(page, size, folderId, type, dateSort, locale));
         } catch (Exception e) {
             e.printStackTrace();
             throw new ResponseStatusException(HttpStatus.valueOf("error"), e.getMessage());
@@ -102,7 +104,7 @@ public class BlogController {
             @RequestParam("size") int size
     ) {
         try {
-            return blogService.searchDocuments(value, new PaginationDTO(page, size, null, null, null));
+            return blogService.searchDocuments(value, new PaginationDTO(page, size, null, null, null, null));
         } catch (Exception e) {
             e.printStackTrace();
             throw new ResponseStatusException(HttpStatus.valueOf("error"), e.getMessage());
