@@ -1,0 +1,20 @@
+package server.nadeliv.travel.repo;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.mongodb.repository.MongoRepository;
+import org.springframework.stereotype.Repository;
+import server.nadeliv.travel.model.entities.Travels;
+import server.nadeliv.travel.model.enums.TravelVisibility;
+
+import java.util.List;
+
+@Repository
+public interface TravelsRepo extends MongoRepository<Travels, String> {
+
+    Page<Travels> findByVisibility(TravelVisibility visibility, Pageable pageable);
+
+    Page<Travels> findByIdIn(List<String> ids, Pageable pageable);
+
+    List<Travels> findByIdIn(List<String> ids);
+}

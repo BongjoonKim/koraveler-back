@@ -1,5 +1,5 @@
 # 소개
-Koraveler라는 여행 소개 사이트 제작 프로젝트의 백엔드 repository입니다.
+Nadeliv 여행 소개 사이트 제작 프로젝트의 백엔드 repository입니다.
 
 # 기술
   JAVA : 21 <br/>
