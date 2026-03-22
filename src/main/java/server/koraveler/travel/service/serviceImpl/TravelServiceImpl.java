@@ -21,6 +21,7 @@ import server.koraveler.travel.model.entities.Travels;
 import server.koraveler.travel.model.enums.TravelRole;
 import server.koraveler.travel.model.enums.TravelVisibility;
 import server.koraveler.travel.model.mapper.TravelMapper;
+import server.koraveler.travel.repo.TravelChannelRepo;
 import server.koraveler.travel.repo.TravelMediaRepo;
 import server.koraveler.travel.repo.TravelUsersRepo;
 import server.koraveler.travel.repo.TravelsRepo;
@@ -46,6 +47,7 @@ public class TravelServiceImpl implements TravelService {
     private final TravelMediaRepo travelMediaRepo;
     private final TravelMapper travelMapper;
     private final S3Service s3Service;
+    private final TravelChannelRepo travelChannelRepo;
 
     // ==================== Travel CRUD ====================
 
@@ -126,6 +128,7 @@ public class TravelServiceImpl implements TravelService {
         validateAdminRole(travelId, userId);
 
         // 관련 데이터 삭제
+        travelChannelRepo.deleteByTravelId(travelId);
         travelUsersRepo.deleteByTravelId(travelId);
         travelMediaRepo.deleteByTravelId(travelId);
         travelsRepo.deleteById(travelId);
@@ -345,38 +348,6 @@ public class TravelServiceImpl implements TravelService {
 
         List<TravelUsers> members = travelUsersRepo.findByTravelId(travelId);
         return travelMapper.toResponse(updatedTravel, members);
-    }
-
-    // ==================== Channel Management ====================
-
-    @Override
-    public TravelResponse linkChannel(String travelId, String channelId, String userId) {
-        Travels travel = findTravelById(travelId);
-        validateAdminRole(travelId, userId);
-
-        if (!travel.getChannelIds().contains(channelId)) {
-            travel.getChannelIds().add(channelId);
-            travel.setUpdated(LocalDateTime.now());
-            travel.setUpdatedUser(userId);
-            travelsRepo.save(travel);
-        }
-
-        List<TravelUsers> members = travelUsersRepo.findByTravelId(travelId);
-        return travelMapper.toResponse(travel, members);
-    }
-
-    @Override
-    public TravelResponse unlinkChannel(String travelId, String channelId, String userId) {
-        Travels travel = findTravelById(travelId);
-        validateAdminRole(travelId, userId);
-
-        travel.getChannelIds().remove(channelId);
-        travel.setUpdated(LocalDateTime.now());
-        travel.setUpdatedUser(userId);
-        travelsRepo.save(travel);
-
-        List<TravelUsers> members = travelUsersRepo.findByTravelId(travelId);
-        return travelMapper.toResponse(travel, members);
     }
 
     // ==================== Media Management ====================

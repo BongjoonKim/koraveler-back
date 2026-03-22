@@ -40,15 +40,15 @@ src/main/java/server/koraveler/
 │   └── component/              # JWT Filter 등
 ├── travel/
 │   ├── model/
-│   │   ├── entities/           # Travels, TravelUsers, TravelMedia
-│   │   ├── dto/                # Request/Response DTO
-│   │   ├── enums/              # TravelRole, TravelStatus, TravelVisibility
+│   │   ├── entities/           # Travels, TravelUsers, TravelMedia, TravelChannel
+│   │   ├── dto/                # Request/Response DTO (Travel*, TravelChannel*)
+│   │   ├── enums/              # TravelRole, TravelStatus, TravelVisibility, ChannelContextType
 │   │   ├── embedded/           # TravelSchedule (내장 문서)
-│   │   └── mapper/             # TravelMapper
-│   ├── repo/                   # TravelsRepo, TravelUsersRepo, TravelMediaRepo
+│   │   └── mapper/             # TravelMapper, TravelChannelMapper
+│   ├── repo/                   # TravelsRepo, TravelUsersRepo, TravelMediaRepo, TravelChannelRepo
 │   ├── service/
-│   │   └── serviceImpl/        # TravelServiceImpl
-│   └── controller/             # TravelController
+│   │   └── serviceImpl/        # TravelServiceImpl, TravelChannelServiceImpl
+│   └── controller/             # TravelController, TravelChannelController
 ├── connections/                # 연결 관계 (북마크 등)
 ├── utils/                      # 유틸리티 (JwtUtil 등)
 └── error/                      # 예외 처리
@@ -666,17 +666,39 @@ Page<Entity> findByParentIdAndDeletedFalse(String parentId, Pageable pageable);
 ---
 
 ## 10. 에러 처리
+
+### 10.1 CustomException + ErrorCode (권장 — Travel, Chat 모듈)
+```java
+// ErrorCode enum 정의 (server.koraveler.error.ErrorCode)
+TRAVEL_NOT_FOUND(HttpStatus.NOT_FOUND, "TRV_001", "여행 프로젝트를 찾을 수 없습니다"),
+NOT_TRAVEL_MEMBER(HttpStatus.NOT_FOUND, "TRV_006", "여행 멤버가 아닙니다"),
+TRAVEL_CHANNEL_NOT_FOUND(HttpStatus.NOT_FOUND, "TRV_015", "여행 채널을 찾을 수 없습니다"),
+CHANNEL_ALREADY_LINKED(HttpStatus.CONFLICT, "TRV_016", "이미 연결된 채널입니다"),
+
+// Service에서 throw
+throw new CustomException(ErrorCode.TRAVEL_NOT_FOUND);
+throw new CustomException(ErrorCode.UNAUTHORIZED_MEMBER_MANAGE);
+
+// CustomException 필드: status, code, msg, detail (getErrorCode() 없음)
+// 에러 코드 비교 시:
+if (ErrorCode.ALREADY_CHANNEL_MEMBER.getCode().equals(e.getCode())) { ... }
+
+// Controller에서는 try-catch 없이 GlobalExceptionHandler가 처리
+@PostMapping
+public ResponseEntity<TravelChannelResponse> createChannel(...) {
+    return ResponseEntity.ok(service.createChannel(travelId, request, userId));
+}
+```
+
+### 10.2 레거시 방식 (Blog 모듈)
 ```java
 // Service에서 Exception throw
-if (!entity.getUserId().equals(userId)) {
-    throw new Exception("권한이 없습니다.");
-}
+throw new Exception("권한이 없습니다.");
 
 // Controller에서 catch 후 적절한 응답
 try {
     return ResponseEntity.ok(service.update(id, dto, userId));
 } catch (Exception e) {
-    log.error("수정 실패: id={}", id, e);
     return ResponseEntity.status(HttpStatus.BAD_REQUEST)
             .body("수정 실패: " + e.getMessage());
 }
@@ -695,6 +717,7 @@ Base Path: `/api/v1/travels` (모든 API 인증 필수)
 public enum TravelVisibility { PUBLIC, PRIVATE }
 public enum TravelStatus { PLANNING, IN_PROGRESS, COMPLETED, CANCELLED }
 public enum TravelRole { ADMIN, USER }
+public enum ChannelContextType { GENERAL, ITINERARY, PLACE, MEDIA, INFO }
 ```
 
 ### 11.3 Entity 구조
@@ -717,6 +740,13 @@ public enum TravelRole { ADMIN, USER }
 - `mimeType`, `fileSize` (Long), `width`, `height`, `duration` (Integer)
 - `description`, `takenAt` (LocalDateTime)
 
+**TravelChannel** (collection: `travel_channels`) - CommonDTO 상속, 브릿지 모델
+- `id`, `travelId` (@Indexed), `channelId` (@Indexed)
+- `contextType` (ChannelContextType), `contextId` (nullable)
+- `channelPurpose` (String)
+- `isPinned` (Boolean, default false), `displayOrder` (Integer, default 0)
+- `isDeleted` (Boolean, default false) — Soft Delete
+
 **TravelSchedule** (내장 문서, 별도 컬렉션 없음)
 - `id`, `dayNumber` (Integer), `date` (LocalDate)
 - `title`, `description`, `sortOrder` (Integer)
@@ -734,10 +764,17 @@ public enum TravelRole { ADMIN, USER }
 **TravelResponse** — 전체 Travel 정보 + members(List<TravelMemberResponse>) + memberCount
 **TravelListResponse** — travels(List<TravelResponse>) + pagination(totalCount, pageSize, currentPage, hasMore)
 
+**TravelChannelCreateRequest** — name 필수(2-50자), description(max 200), contextType, contextId, channelPurpose, isPinned, displayOrder
+**TravelChannelUpdateRequest** — contextType, contextId, channelPurpose, isPinned, displayOrder (전부 optional)
+**TravelChannelResponse** — bridge 필드(id, travelId, channelId, contextType, contextId, channelPurpose, isPinned, displayOrder) + channel 정보(channelName, channelDescription, memberCount, lastMessageAt) + createdAt, updatedAt
+
 ### 11.5 Mapper
-`TravelMapper` (@Component)로 Entity ↔ Response 변환. 생성 시 visibility 미입력이면 PRIVATE, status는 PLANNING 기본값.
+`TravelMapper` (@Component) — Entity ↔ Response 변환. 생성 시 visibility 미입력이면 PRIVATE, status는 PLANNING 기본값.
+`TravelChannelMapper` (@Component) — TravelChannel ↔ Response 변환 + ChannelCreateRequest 생성. contextType 미입력이면 GENERAL 기본값. channelType은 GROUP 고정.
 
 ### 11.6 Controller 엔드포인트
+
+**TravelController** (`/api/v1/travels`)
 ```
 # 여행 CRUD
 POST   /api/v1/travels                                    → 생성
@@ -759,17 +796,60 @@ POST   /api/v1/travels/{travelId}/schedules               → 일정 추가
 PUT    /api/v1/travels/{travelId}/schedules/{scheduleId}  → 일정 수정
 DELETE /api/v1/travels/{travelId}/schedules/{scheduleId}  → 일정 삭제 (204)
 
-# 채널 연결
-POST   /api/v1/travels/{travelId}/channels/{channelId}    → 채널 연결
-DELETE /api/v1/travels/{travelId}/channels/{channelId}    → 채널 해제 (204)
-
 # 미디어
 POST   /api/v1/travels/{travelId}/media                   → 업로드 (multipart/form-data)
 GET    /api/v1/travels/{travelId}/media?page=0&size=20    → 목록 조회
 DELETE /api/v1/travels/{travelId}/media/{mediaId}         → 삭제 (204)
 ```
 
-### 11.7 참고 사항
+**TravelChannelController** (`/api/v1/travels/{travelId}/channels`)
+```
+POST   /api/v1/travels/{travelId}/channels                          → 채널 생성
+GET    /api/v1/travels/{travelId}/channels                          → 채널 목록 조회
+GET    /api/v1/travels/{travelId}/channels/{travelChannelId}        → 단일 채널 조회
+PUT    /api/v1/travels/{travelId}/channels/{travelChannelId}        → 메타데이터 수정
+DELETE /api/v1/travels/{travelId}/channels/{travelChannelId}        → 삭제 (204)
+POST   /api/v1/travels/{travelId}/channels/{travelChannelId}/sync   → 멤버 동기화
+```
+
+### 11.7 TravelChannel 브릿지 모델
+
+Travel 모듈과 Chat 모듈은 **TravelChannel 브릿지**로 느슨하게 연결된다.
+기존 Chat 모듈(Channels, Messages, ChannelMembers)은 수정하지 않는다.
+
+```
+Travels 1:N TravelChannel 1:1 Channels
+```
+
+**핵심 동작:**
+- **채널 생성**: TravelChannelService → ChannelService.createChannel() 호출 → bridge 저장 → Travels.channelIds 동기화
+- **채널 목록**: bridge 조회 → ChannelsRepo.findByIdIn()으로 채널 정보 일괄 조회 (N+1 방지)
+- **채널 삭제**: bridge soft delete → Travels.channelIds에서 제거 → ChannelService.archiveChannel()
+- **멤버 동기화**: TravelUsers → ChannelMemberService.addMember() (이미 멤버면 skip)
+
+**contextType + contextId 조합:**
+| contextType | contextId | 용도 |
+|-------------|-----------|------|
+| GENERAL | null | 자유 토론방 |
+| ITINERARY | itineraryId | 특정 일정 토론 |
+| PLACE | placeId | 특정 장소 토론 |
+| MEDIA | null | 사진 공유 |
+| INFO | null | 교통편/숙소 정보 |
+
+**의존성 (TravelChannelServiceImpl):**
+- `TravelChannelRepo`, `TravelsRepo`, `TravelUsersRepo` (travel 모듈)
+- `ChannelService`, `ChannelMemberService`, `ChannelsRepo` (chat 모듈)
+- `TravelChannelMapper` (travel 모듈)
+
+**주의사항:**
+1. Chat 모듈 무수정 원칙
+2. TravelChannel은 travel 모듈 소속
+3. channelId는 유니크 — 하나의 채널은 하나의 Travel에만 소속
+4. 채널 삭제 = bridge soft delete + 채널 archive (메시지 데이터 보존)
+5. 권한 체크: CRUD는 해당 Travel의 멤버(ADMIN)만 가능, 조회는 멤버 전체
+6. deleteTravel 시 travelChannelRepo.deleteByTravelId()로 일괄 정리
+
+### 11.8 참고 사항
 - 미디어 업로드는 `multipart/form-data` 형식: `file` (필수) + `request` (선택, JSON 메타데이터)
 - S3Service를 통해 파일 업로드 처리
 - 여행 생성자는 자동으로 ADMIN 역할 멤버로 등록됨

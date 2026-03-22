@@ -142,26 +142,6 @@ public class TravelController {
         return ResponseEntity.noContent().build();
     }
 
-    // ==================== Channel Management ====================
-
-    @PostMapping("/{travelId}/channels/{channelId}")
-    public ResponseEntity<TravelResponse> linkChannel(
-            @PathVariable String travelId,
-            @PathVariable String channelId,
-            @AuthenticationPrincipal CustomUserDetails userDetails) {
-        TravelResponse response = travelService.linkChannel(travelId, channelId, userDetails.getUsername());
-        return ResponseEntity.ok(response);
-    }
-
-    @DeleteMapping("/{travelId}/channels/{channelId}")
-    public ResponseEntity<Void> unlinkChannel(
-            @PathVariable String travelId,
-            @PathVariable String channelId,
-            @AuthenticationPrincipal CustomUserDetails userDetails) {
-        travelService.unlinkChannel(travelId, channelId, userDetails.getUsername());
-        return ResponseEntity.noContent().build();
-    }
-
     // ==================== Media Management ====================
 
     @PostMapping("/{travelId}/media")

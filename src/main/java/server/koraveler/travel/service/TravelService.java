@@ -30,10 +30,6 @@ public interface TravelService {
     TravelResponse updateSchedule(String travelId, String scheduleId, TravelScheduleRequest request, String userId);
     TravelResponse deleteSchedule(String travelId, String scheduleId, String userId);
 
-    // Channel Management
-    TravelResponse linkChannel(String travelId, String channelId, String userId);
-    TravelResponse unlinkChannel(String travelId, String channelId, String userId);
-
     // Media Management
     TravelMedia uploadMedia(String travelId, MultipartFile file, TravelMediaRequest request, String userId);
     List<TravelMedia> getMediaList(String travelId, String userId, int page, int size);

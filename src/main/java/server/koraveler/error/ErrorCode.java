@@ -77,6 +77,8 @@ public enum ErrorCode {
     INVALID_MEDIA_TYPE(HttpStatus.BAD_REQUEST, "TRV_012", "사진 또는 영상 파일만 업로드 가능합니다"),
     S3_UPLOAD_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "TRV_013", "파일 업로드에 실패했습니다"),
     S3_DOWNLOAD_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "TRV_014", "파일 다운로드에 실패했습니다"),
+    TRAVEL_CHANNEL_NOT_FOUND(HttpStatus.NOT_FOUND, "TRV_015", "여행 채널을 찾을 수 없습니다"),
+    CHANNEL_ALREADY_LINKED(HttpStatus.CONFLICT, "TRV_016", "이미 연결된 채널입니다"),
 
     // ============= 일반 에러 (GEN) =============
     INVALID_INPUT(HttpStatus.BAD_REQUEST, "GEN_001", "Invalid input / 잘못된 입력값입니다"),
