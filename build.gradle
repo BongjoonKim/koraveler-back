@@ -43,6 +43,10 @@ dependencies {
     // aop
     implementation 'org.springframework.boot:spring-boot-starter-aop'
 
+    // 이메일 인증
+    implementation 'software.amazon.awssdk:ses:2.25.0'
+
+
 
     // jwt
     implementation group: 'io.jsonwebtoken', name: 'jjwt-api', version: '0.11.2'
