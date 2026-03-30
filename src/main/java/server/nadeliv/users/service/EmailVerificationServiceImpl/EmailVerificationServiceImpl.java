@@ -5,6 +5,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import server.nadeliv.common.service.EmailService;
+import server.nadeliv.error.CustomException;
+import server.nadeliv.error.ErrorCode;
 import server.nadeliv.users.service.EmailVerificationService;
 
 import java.security.SecureRandom;
@@ -19,10 +21,10 @@ public class EmailVerificationServiceImpl implements EmailVerificationService {
     private final EmailService emailService;
 
     // Redis 키 접두사
-    private static final String CODE_PREFIX = "email:verify:";        // 인증 코드
-    private static final String VERIFIED_PREFIX = "email:verified:";  // 인증 완료 플래그
-    private static final String SEND_COUNT_PREFIX = "email:send-count:"; // 발송 횟수
-    private static final String FAIL_COUNT_PREFIX = "email:fail-count:"; // 검증 실패 횟수
+    private static final String CODE_PREFIX = "email:verify:";
+    private static final String VERIFIED_PREFIX = "email:verified:";
+    private static final String SEND_COUNT_PREFIX = "email:send-count:";
+    private static final String FAIL_COUNT_PREFIX = "email:fail-count:";
 
     // TTL 설정
     private static final Duration CODE_TTL = Duration.ofMinutes(5);
@@ -31,8 +33,8 @@ public class EmailVerificationServiceImpl implements EmailVerificationService {
     private static final Duration FAIL_COUNT_TTL = Duration.ofMinutes(5);
 
     // 제한 횟수
-    private static final int MAX_SEND_COUNT = 5;   // 하루 최대 발송 횟수
-    private static final int MAX_FAIL_COUNT = 5;   // 최대 검증 실패 횟수
+    private static final int MAX_SEND_COUNT = 10;
+    private static final int MAX_FAIL_COUNT = 10;
 
     @Override
     public void sendCode(String email) {
@@ -43,7 +45,8 @@ public class EmailVerificationServiceImpl implements EmailVerificationService {
 
         if (currentCount >= MAX_SEND_COUNT) {
             log.warn("인증 코드 발송 횟수 초과: {}", email);
-            throw new RuntimeException("일일 인증 코드 발송 횟수(5회)를 초과했습니다. 24시간 후 다시 시도해주세요.");
+            throw new CustomException(ErrorCode.EMAIL_SEND_LIMIT_EXCEEDED,
+                    "24시간 후 다시 시도해주세요.");
         }
 
         // 2. 6자리 랜덤 코드 생성
@@ -79,10 +82,10 @@ public class EmailVerificationServiceImpl implements EmailVerificationService {
         int failCount = (failCountStr != null) ? Integer.parseInt(failCountStr) : 0;
 
         if (failCount >= MAX_FAIL_COUNT) {
-            // 코드 무효화
             redisTemplate.delete(codeKey);
             log.warn("인증 코드 검증 실패 횟수 초과로 코드 무효화: {}", email);
-            throw new RuntimeException("인증 시도 횟수를 초과했습니다. 새로운 인증 코드를 요청해주세요.");
+            throw new CustomException(ErrorCode.EMAIL_VERIFY_ATTEMPTS_EXCEEDED,
+                    "새로운 인증 코드를 요청해주세요.");
         }
 
         // 2. 저장된 코드 조회
@@ -90,12 +93,11 @@ public class EmailVerificationServiceImpl implements EmailVerificationService {
 
         if (storedCode == null) {
             log.warn("인증 코드 만료 또는 미존재: {}", email);
-            throw new RuntimeException("인증 코드가 만료되었거나 존재하지 않습니다. 새로운 코드를 요청해주세요.");
+            throw new CustomException(ErrorCode.EMAIL_CODE_EXPIRED);
         }
 
         // 3. 코드 비교
         if (!storedCode.equals(code)) {
-            // 실패 횟수 증가
             if (failCount == 0) {
                 redisTemplate.opsForValue().set(failCountKey, "1", FAIL_COUNT_TTL);
             } else {
@@ -136,7 +138,7 @@ public class EmailVerificationServiceImpl implements EmailVerificationService {
      */
     private String generateCode() {
         SecureRandom random = new SecureRandom();
-        int code = 100000 + random.nextInt(900000); // 100000 ~ 999999
+        int code = 100000 + random.nextInt(900000);
         return String.valueOf(code);
     }
 }

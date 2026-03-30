@@ -20,6 +20,11 @@ public enum ErrorCode {
     PASSWORD_MISMATCH(HttpStatus.BAD_REQUEST, "USER_004", "Current password does not match"),
     EMAIL_ALREADY_EXISTS(HttpStatus.CONFLICT, "USER_005", "Email is already in use"),
     ACCOUNT_DISABLED(HttpStatus.FORBIDDEN, "USER_006", "Account has been disabled"),
+    EMAIL_NOT_VERIFIED(HttpStatus.BAD_REQUEST, "USER_007", "이메일 인증이 필요합니다"),
+    EMAIL_SEND_LIMIT_EXCEEDED(HttpStatus.TOO_MANY_REQUESTS, "USER_008", "일일 인증 코드 발송 횟수(5회)를 초과했습니다"),
+    EMAIL_VERIFY_ATTEMPTS_EXCEEDED(HttpStatus.TOO_MANY_REQUESTS, "USER_009", "인증 시도 횟수를 초과했습니다"),
+    EMAIL_CODE_EXPIRED(HttpStatus.BAD_REQUEST, "USER_010", "인증 코드가 만료되었거나 존재하지 않습니다"),
+    EMAIL_CODE_MISMATCH(HttpStatus.BAD_REQUEST, "USER_011", "인증 코드가 일치하지 않습니다"),
 
     // ============= 메시지 관련 에러 (MSG) =============
     MESSAGE_NOT_FOUND(HttpStatus.NOT_FOUND, "MSG_001", "메시지를 찾을 수 없습니다"),
