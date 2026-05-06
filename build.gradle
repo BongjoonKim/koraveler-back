@@ -64,4 +64,7 @@ dependencies {
 
     // STOMP 웹소켓 지원
     implementation 'org.springframework.boot:spring-boot-starter-websocket'
+
+    // Jsoup - HTML 파서 (OG 메타데이터 스크래핑용)
+    implementation 'org.jsoup:jsoup:1.17.2'
 }

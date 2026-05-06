@@ -28,6 +28,10 @@ public class Documents extends CommonDTO {
     private String thumbnailImgUrl;
     private boolean draft;
 
+    // Soft delete: 휴지통 처리. deletedAt 기준 90일 후 자동 영구 삭제됨
+    private boolean isDeleted;
+    private LocalDateTime deletedAt;
+
     // i18n: 원본 언어 (기본값 "ko")
     @Builder.Default
     private String originalLocale = "ko";

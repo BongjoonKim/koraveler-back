@@ -6,7 +6,8 @@ public class BlogConstants {
         MY_BLOG("my-blog"),
         BOOKMARK("bookmark"),
         DRAFT("draft"),
-        HIDDEN("hidden");
+        HIDDEN("hidden"),
+        TRASH("trash");
 
         private final String value;
 

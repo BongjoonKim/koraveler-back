@@ -138,6 +138,21 @@ public class BlogController {
         }
     }
 
+    // 휴지통에서 복구 (인증 필요)
+    @PatchMapping("/document/{id}/restore")
+    public ResponseEntity<?> restoreDocument(@PathVariable("id") String id) {
+        try {
+            blogService.restoreDocument(id);
+            Map<String, String> result = new HashMap<>();
+            result.put("id", id);
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            log.error("Restore failed for document {}", id, e);
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body("restore failed: " + e.getMessage());
+        }
+    }
+
 
     /**
      * 일반 글을 Featured로 설정 (관리자용)

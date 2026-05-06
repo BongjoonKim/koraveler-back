@@ -18,6 +18,7 @@ public interface BlogService {
     DocumentsInfo searchDocuments(String value, PaginationDTO pageDTO) throws Exception;
     DocumentsDTO getDocument(String id) throws Exception;
     void deleteDocument(String id) throws Exception;
+    void restoreDocument(String id) throws Exception;
 
     // ========== Featured 관리 메서드 ==========
     // Featured로 설정

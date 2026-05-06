@@ -298,10 +298,10 @@ public class BlogServiceImpl implements BlogService {
             Pageable pageable = PageRequest.of(pageDTO.getPage(), pageDTO.getSize(), sort);
 
             if ("all".equals(pageDTO.getFolderId()) || pageDTO.getPage() == -1) {
-                documents = blogsRepo.findAllByDraftIsFalseOrDraftIsNull(pageable);
+                documents = blogsRepo.findAllByDraftIsFalseOrDraftIsNullAndIsDeletedFalse(pageable);
             } else {
                 if (ObjectUtils.isEmpty(pageDTO.getPageType())) {
-                    documents = blogsRepo.findAllByDraftIsFalseOrDraftIsNull(pageable);
+                    documents = blogsRepo.findAllByDraftIsFalseOrDraftIsNullAndIsDeletedFalse(pageable);
                 } else {
                     Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
                     if (authentication != null && authentication.getPrincipal() != null) {
@@ -320,9 +320,10 @@ public class BlogServiceImpl implements BlogService {
                                     System.out.println("User ID: " + users.getUserId());
                                 }
 
-                                // 1. Draft 필터
+                                // 1. Draft 필터 + 휴지통 제외
                                 AggregationOperation matchDraft = Aggregation.match(
                                         Criteria.where("draft").ne(true)
+                                                .and("isDeleted").ne(true)
                                 );
 
                                 // 2. Lookup - 이제 타입 변환 없이 직접 사용 가능
@@ -391,6 +392,8 @@ public class BlogServiceImpl implements BlogService {
                                 documents = this.findByCreatedUserOrUpdatedUserAndDraft(users.getUserId(), users.getUserId(), pageable, true);
                             } else if (BlogConstants.BlogPageType.HIDDEN.getValue().equals(pageDTO.getPageType())) {
                                 documents = this.findByCreatedUserAndHidden(users.getUserId(), pageable);
+                            } else if (BlogConstants.BlogPageType.TRASH.getValue().equals(pageDTO.getPageType())) {
+                                documents = this.findTrashedByCreatedUser(users.getUserId(), pageable);
                             }
                         } else {
                             throw new Exception("there is no user : " + username);
@@ -469,6 +472,16 @@ public class BlogServiceImpl implements BlogService {
     public DocumentsDTO getDocument(String id) throws Exception {
         try {
             Documents documents = blogsRepo.findById(id).get();
+            // 휴지통 글은 본인만 조회 가능 (휴지통 화면용)
+            if (documents.isDeleted()) {
+                Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+                String username = (authentication != null && authentication.getPrincipal() instanceof UserDetails)
+                        ? ((UserDetails) authentication.getPrincipal()).getUsername()
+                        : null;
+                if (username == null || !username.equals(documents.getCreatedUser())) {
+                    throw new Exception("document not available");
+                }
+            }
             DocumentsDTO documentsDTO = new DocumentsDTO();
             BeanUtils.copyProperties(documents, documentsDTO);
             return documentsDTO;
@@ -480,10 +493,66 @@ public class BlogServiceImpl implements BlogService {
     @Override
     public void deleteDocument(String id) throws Exception {
         try {
-            blogsRepo.deleteById(id);
+            // Soft delete: 휴지통으로 이동. 90일 후 BlogCleanupScheduler가 영구 삭제 처리.
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            String username = (authentication != null && authentication.getPrincipal() instanceof UserDetails)
+                    ? ((UserDetails) authentication.getPrincipal()).getUsername()
+                    : null;
+
+            Documents document = blogsRepo.findById(id)
+                    .orElseThrow(() -> new Exception("document not found: " + id));
+
+            // 본인 글이거나 인증되지 않은 호출(현재 /ps/document 경로 호환)일 때만 진행.
+            if (username != null && document.getCreatedUser() != null
+                    && !username.equals(document.getCreatedUser())) {
+                throw new Exception("not allowed to delete this document");
+            }
+
+            LocalDateTime now = LocalDateTime.now();
+            Query query = new Query(Criteria.where("_id").is(id));
+            org.springframework.data.mongodb.core.query.Update update =
+                    new org.springframework.data.mongodb.core.query.Update()
+                            .set("isDeleted", true)
+                            .set("deletedAt", now)
+                            .set("updated", now);
+            if (username != null) {
+                update.set("updatedUser", username);
+            }
+            mongoTemplate.updateFirst(query, update, Documents.class);
+            log.info("Soft deleted document: id={}, deletedAt={}", id, now);
         } catch (Exception e) {
             throw e;
         }
+    }
+
+    @Override
+    public void restoreDocument(String id) throws Exception {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !(authentication.getPrincipal() instanceof UserDetails)) {
+            throw new Exception("there is no login information");
+        }
+        String username = ((UserDetails) authentication.getPrincipal()).getUsername();
+
+        Documents document = blogsRepo.findById(id)
+                .orElseThrow(() -> new Exception("document not found: " + id));
+
+        if (document.getCreatedUser() != null && !username.equals(document.getCreatedUser())) {
+            throw new Exception("not allowed to restore this document");
+        }
+        if (!document.isDeleted()) {
+            return;
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        Query query = new Query(Criteria.where("_id").is(id));
+        org.springframework.data.mongodb.core.query.Update update =
+                new org.springframework.data.mongodb.core.query.Update()
+                        .set("isDeleted", false)
+                        .unset("deletedAt")
+                        .set("updated", now)
+                        .set("updatedUser", username);
+        mongoTemplate.updateFirst(query, update, Documents.class);
+        log.info("Restored document: id={}, by={}", id, username);
     }
 
     // 내부적으로 카운트를 담을 DTO
@@ -500,11 +569,15 @@ public class BlogServiceImpl implements BlogService {
     }
 
     private Page<Documents> findByCreatedUserOrUpdatedUserAndDraft(String createdUser, String updatedUser, Pageable pageable, boolean isDraft) {
-        // 조건 생성
-        Criteria criteria = new Criteria().orOperator(
-                Criteria.where("createdUser").is(createdUser),
-                Criteria.where("updatedUser").is(updatedUser)
-        ).and("draft").is(isDraft);
+        // 조건 생성: 본인 글 + draft 일치 + 휴지통 제외
+        Criteria criteria = new Criteria().andOperator(
+                new Criteria().orOperator(
+                        Criteria.where("createdUser").is(createdUser),
+                        Criteria.where("updatedUser").is(updatedUser)
+                ),
+                Criteria.where("draft").is(isDraft),
+                Criteria.where("isDeleted").ne(true)
+        );
 
         // 쿼리 생성
         Query query = new Query(criteria);
@@ -523,7 +596,21 @@ public class BlogServiceImpl implements BlogService {
     private Page<Documents> findByCreatedUserAndHidden(String createdUser, Pageable pageable) {
         Criteria criteria = Criteria.where("createdUser").is(createdUser)
                 .and("disclose").is(false)
-                .and("draft").is(false);
+                .and("draft").is(false)
+                .and("isDeleted").ne(true);
+
+        Query query = new Query(criteria);
+        long total = mongoTemplate.count(query, Documents.class);
+        query.with(pageable);
+
+        List<Documents> entities = mongoTemplate.find(query, Documents.class);
+        return new PageImpl<>(entities, pageable, total);
+    }
+
+    // 휴지통: soft-deleted 문서 목록 조회 (본인 글만)
+    private Page<Documents> findTrashedByCreatedUser(String createdUser, Pageable pageable) {
+        Criteria criteria = Criteria.where("createdUser").is(createdUser)
+                .and("isDeleted").is(true);
 
         Query query = new Query(criteria);
         long total = mongoTemplate.count(query, Documents.class);
@@ -720,11 +807,11 @@ public class BlogServiceImpl implements BlogService {
 
         if (StringUtils.hasText(search)) {
             // 검색어가 있으면 제목/내용에서 검색
-            documents = blogsRepo.findByDraftFalseAndFeaturedReadyFalseAndTitleContainingOrContentsContaining(
+            documents = blogsRepo.findByDraftFalseAndFeaturedReadyFalseAndIsDeletedFalseAndTitleContainingOrContentsContaining(
                     search, search, pageable);
         } else {
             // Featured가 아니고 draft가 아닌 모든 글
-            documents = blogsRepo.findByDraftFalseAndFeaturedReadyFalse(pageable);
+            documents = blogsRepo.findByDraftFalseAndFeaturedReadyFalseAndIsDeletedFalse(pageable);
         }
 
         List<DocumentsDTO> dtoList = documents.getContent().stream()
@@ -748,8 +835,8 @@ public class BlogServiceImpl implements BlogService {
         Pageable pageable = PageRequest.of(page, size,
                 Sort.by(Sort.Direction.DESC, "featuredSchedule.approvedAt"));
 
-        // Featured로 설정된 적이 있는 모든 문서 (활성/비활성 포함)
-        Page<Documents> featuredDocs = blogsRepo.findByFeaturedReadyTrue(pageable);
+        // Featured로 설정된 적이 있는 모든 문서 (활성/비활성 포함, 휴지통 제외)
+        Page<Documents> featuredDocs = blogsRepo.findByFeaturedReadyTrueAndIsDeletedFalse(pageable);
 
         List<DocumentsDTO> dtoList = featuredDocs.getContent().stream()
                 .map(doc -> {
