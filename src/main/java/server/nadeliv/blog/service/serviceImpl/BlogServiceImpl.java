@@ -8,6 +8,7 @@ import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.aggregation.*;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.support.PageableExecutionUtils;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -15,14 +16,19 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 import org.springframework.util.ObjectUtils;
 import org.springframework.util.StringUtils;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import server.nadeliv.blog.constants.BlogConstants;
 import server.nadeliv.blog.dto.DocumentsDTO;
 import server.nadeliv.blog.dto.DocumentsInfo;
 import server.nadeliv.blog.dto.PaginationDTO;
+import server.nadeliv.blog.dto.PopularPostDTO;
+import server.nadeliv.blog.model.DocumentView;
 import server.nadeliv.blog.model.Documents;
 import server.nadeliv.blog.repo.BlogsRepo;
 import server.nadeliv.blog.service.BlogService;
 import server.nadeliv.connections.bookmarks.repo.BookmarksRepo;
+import server.nadeliv.connections.follows.service.UserFollowService;
 import server.nadeliv.i18n.model.entities.PostTranslation;
 import server.nadeliv.i18n.model.enums.TranslationStatus;
 import server.nadeliv.i18n.repo.PostTranslationRepo;
@@ -32,8 +38,11 @@ import server.nadeliv.users.repo.UsersRepo;
 import org.bson.Document;  // 이 import 추가 필요!
 
 
+import java.time.Duration;
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -59,6 +68,17 @@ public class BlogServiceImpl implements BlogService {
 
     @Autowired
     private PostTranslationRepo postTranslationRepo;
+
+    @Autowired
+    private RedisTemplate<String, String> redisTemplate;
+
+    @Autowired
+    private UserFollowService userFollowService;
+
+    private final ObjectMapper popularObjectMapper = new ObjectMapper();
+
+    private static final String POPULAR_CACHE_PREFIX = "blog:popular:";
+    private static final Duration POPULAR_CACHE_TTL = Duration.ofMinutes(15);
 
     private void testAggregationSteps(
             AggregationOperation matchDraft,
@@ -428,11 +448,52 @@ public class BlogServiceImpl implements BlogService {
     @Override
     public DocumentsInfo searchDocuments(String value, PaginationDTO pageDTO) throws Exception {
         try {
-            Sort.Order updatedSort = "ASC".equals(pageDTO.getDateSort()) ? Sort.Order.asc("updated") : Sort.Order.desc("updated");
-            Sort sort = Sort.by(updatedSort);
-            Pageable pageable = PageRequest.of(pageDTO.getPage(), pageDTO.getSize(), sort);
+            Pageable pageable = PageRequest.of(pageDTO.getPage(), pageDTO.getSize());
 
-            Page<Documents> documents = blogsRepo.findByTitleOrContentsWithDisclose(value, value, pageable);
+            // 1) MongoDB text index 기반 검색 (relevance score 순). 인덱스가 없는 환경이거나
+            //    결과가 비면 기존 regex 폴백으로 전환.
+            List<Documents> textResults;
+            long total;
+            try {
+                org.springframework.data.mongodb.core.query.TextCriteria textCriteria =
+                        org.springframework.data.mongodb.core.query.TextCriteria
+                                .forDefaultLanguage()
+                                .matchingAny(value);
+
+                org.springframework.data.mongodb.core.query.TextQuery textQuery =
+                        org.springframework.data.mongodb.core.query.TextQuery.queryText(textCriteria)
+                                .sortByScore();
+                textQuery.addCriteria(Criteria.where("disclose").is(true)
+                        .and("isDeleted").ne(true)
+                        .and("draft").ne(true));
+                textQuery.with(pageable);
+
+                textResults = mongoTemplate.find(textQuery, Documents.class);
+
+                org.springframework.data.mongodb.core.query.Query countQuery = new Query();
+                countQuery.addCriteria(org.springframework.data.mongodb.core.query.TextCriteria
+                        .forDefaultLanguage().matchingAny(value));
+                countQuery.addCriteria(Criteria.where("disclose").is(true)
+                        .and("isDeleted").ne(true)
+                        .and("draft").ne(true));
+                total = mongoTemplate.count(countQuery, Documents.class);
+            } catch (Exception textError) {
+                log.warn("Text search 실패, regex 폴백: {}", textError.getMessage());
+                textResults = null;
+                total = 0;
+            }
+
+            Page<Documents> documents;
+            if (textResults != null && !textResults.isEmpty()) {
+                documents = new PageImpl<>(textResults, pageable, total);
+            } else {
+                // 폴백: 기존 regex 검색 (짧은 검색어 or 텍스트 인덱스 미적용 환경)
+                Sort.Order updatedSort = "ASC".equals(pageDTO.getDateSort())
+                        ? Sort.Order.asc("updated") : Sort.Order.desc("updated");
+                Sort sort = Sort.by(updatedSort);
+                Pageable regexPageable = PageRequest.of(pageDTO.getPage(), pageDTO.getSize(), sort);
+                documents = blogsRepo.findByTitleOrContentsWithDisclose(value, value, regexPageable);
+            }
 
             List<DocumentsDTO> documentsDTO = new ArrayList<>();
             DocumentsInfo documentsInfo = new DocumentsInfo();
@@ -446,6 +507,10 @@ public class BlogServiceImpl implements BlogService {
                 documentsInfo.setDocuments(documentsDTO);
                 documentsInfo.setTotalDocsCnt(documents.getTotalElements());
                 documentsInfo.setTotalPagesCnt(documents.getTotalPages());
+            } else {
+                documentsInfo.setDocuments(new ArrayList<>());
+                documentsInfo.setTotalDocsCnt(0);
+                documentsInfo.setTotalPagesCnt(0);
             }
             return documentsInfo;
         } catch (Exception e) {
@@ -852,6 +917,175 @@ public class BlogServiceImpl implements BlogService {
         info.setTotalPagesCnt(featuredDocs.getTotalPages());
 
         return info;
+    }
+
+    @Override
+    public List<PopularPostDTO> getPopularPosts(String period, int limit) {
+        // 입력 정규화
+        String normalizedPeriod = StringUtils.hasText(period) ? period.toLowerCase() : "month";
+        int normalizedLimit = Math.max(1, Math.min(limit, 20));
+        String cacheKey = POPULAR_CACHE_PREFIX + normalizedPeriod + ":" + normalizedLimit;
+
+        // Redis 캐시 확인
+        try {
+            String cached = redisTemplate.opsForValue().get(cacheKey);
+            if (cached != null) {
+                return popularObjectMapper.readValue(cached, new TypeReference<List<PopularPostDTO>>() {});
+            }
+        } catch (Exception e) {
+            log.warn("Popular posts 캐시 역직렬화 실패 (DB로 폴백): {}", e.getMessage());
+        }
+
+        // 기간 시작점 계산
+        LocalDateTime since = resolvePopularSince(normalizedPeriod);
+
+        // documents_views 컬렉션에서 documentId별 조회수 집계
+        List<AggregationOperation> stages = new ArrayList<>();
+        if (since != null) {
+            stages.add(Aggregation.match(Criteria.where("viewedAt").gte(since)));
+        }
+        stages.add(Aggregation.group("documentId").count().as("viewCount"));
+        stages.add(Aggregation.sort(Sort.Direction.DESC, "viewCount"));
+        // 일부 결과는 비공개/삭제 글일 수 있으므로 limit의 4배까지 후보로 가져온 뒤 필터링
+        stages.add(Aggregation.limit((long) normalizedLimit * 4));
+
+        Aggregation aggregation = Aggregation.newAggregation(stages);
+        AggregationResults<PopularAggResult> aggResults = mongoTemplate.aggregate(
+                aggregation, DocumentView.class, PopularAggResult.class
+        );
+
+        List<PopularAggResult> rawCounts = aggResults.getMappedResults();
+        if (rawCounts.isEmpty()) {
+            cachePopularResult(cacheKey, Collections.emptyList());
+            return Collections.emptyList();
+        }
+
+        // 후보 문서들을 한 번에 조회 후 공개/비삭제만 필터 (N+1 방지)
+        List<String> candidateIds = rawCounts.stream()
+                .map(PopularAggResult::getId)
+                .filter(StringUtils::hasText)
+                .collect(Collectors.toList());
+
+        Map<String, Documents> documentsById = blogsRepo.findAllById(candidateIds).stream()
+                .filter(doc -> !doc.isDraft() && !doc.isDeleted() && doc.isDisclose())
+                .collect(Collectors.toMap(Documents::getId, doc -> doc, (a, b) -> a));
+
+        // 집계 순서를 유지하며 결과 빌드
+        List<PopularPostDTO> result = new ArrayList<>();
+        int rank = 1;
+        for (PopularAggResult agg : rawCounts) {
+            if (result.size() >= normalizedLimit) break;
+            Documents doc = documentsById.get(agg.getId());
+            if (doc == null) continue;
+            result.add(PopularPostDTO.builder()
+                    .rank(rank++)
+                    .id(doc.getId())
+                    .title(doc.getTitle())
+                    .thumbnailImgUrl(doc.getThumbnailImgUrl())
+                    .viewCount(agg.getViewCount())
+                    .build());
+        }
+
+        cachePopularResult(cacheKey, result);
+        return result;
+    }
+
+    private LocalDateTime resolvePopularSince(String period) {
+        LocalDateTime now = LocalDateTime.now();
+        return switch (period) {
+            case "day" -> now.minus(1, ChronoUnit.DAYS);
+            case "week" -> now.minus(7, ChronoUnit.DAYS);
+            case "month" -> now.minus(30, ChronoUnit.DAYS);
+            case "all" -> null;
+            default -> now.minus(30, ChronoUnit.DAYS);
+        };
+    }
+
+    private void cachePopularResult(String cacheKey, List<PopularPostDTO> result) {
+        try {
+            String serialized = popularObjectMapper.writeValueAsString(result);
+            redisTemplate.opsForValue().set(cacheKey, serialized, POPULAR_CACHE_TTL);
+        } catch (Exception e) {
+            log.warn("Popular posts 캐시 직렬화 실패: {}", e.getMessage());
+        }
+    }
+
+    // 집계 결과 매핑용. _id 는 documentId 가 들어옴.
+    @lombok.Data
+    @lombok.NoArgsConstructor
+    @lombok.AllArgsConstructor
+    private static class PopularAggResult {
+        @org.springframework.data.annotation.Id
+        private String id;
+        private long viewCount;
+    }
+
+    @Override
+    public DocumentsInfo getFollowingFeed(String viewerUserId, PaginationDTO pageDTO) {
+        DocumentsInfo empty = new DocumentsInfo();
+        empty.setDocuments(new ArrayList<>());
+        empty.setTotalDocsCnt(0);
+        empty.setTotalPagesCnt(0);
+
+        if (viewerUserId == null || viewerUserId.isBlank()) {
+            return empty;
+        }
+
+        List<String> followingIds = userFollowService.getFollowingUserIds(viewerUserId);
+        if (followingIds.isEmpty()) {
+            return empty;
+        }
+
+        Sort.Order updatedSort = "ASC".equals(pageDTO.getDateSort())
+                ? Sort.Order.asc("updated") : Sort.Order.desc("updated");
+        Sort sort = Sort.by(updatedSort);
+        Pageable pageable = PageRequest.of(pageDTO.getPage(), pageDTO.getSize(), sort);
+
+        Criteria criteria = Criteria.where("createdUser").in(followingIds)
+                .and("draft").ne(true)
+                .and("isDeleted").ne(true)
+                .and("disclose").is(true);
+
+        Query query = new Query(criteria);
+        long total = mongoTemplate.count(query, Documents.class);
+        query.with(pageable);
+        List<Documents> docs = mongoTemplate.find(query, Documents.class);
+
+        List<DocumentsDTO> dtoList = docs.stream().map(doc -> {
+            DocumentsDTO dto = new DocumentsDTO();
+            BeanUtils.copyProperties(doc, dto);
+            return dto;
+        }).collect(Collectors.toList());
+
+        // 번역 적용 (기존 로직 재사용)
+        String locale = pageDTO.getLocale();
+        if (StringUtils.hasText(locale) && !"ko".equals(locale) && !dtoList.isEmpty()) {
+            applyTranslations(dtoList, locale);
+        }
+
+        DocumentsInfo result = new DocumentsInfo();
+        result.setDocuments(dtoList);
+        result.setTotalDocsCnt(total);
+        int totalPages = pageable.getPageSize() == 0
+                ? 0 : (int) Math.ceil((double) total / pageable.getPageSize());
+        result.setTotalPagesCnt(totalPages);
+        return result;
+    }
+
+    @Override
+    public long countFollowingFeedSince(String viewerUserId, LocalDateTime since) {
+        if (viewerUserId == null || viewerUserId.isBlank()) return 0L;
+        List<String> followingIds = userFollowService.getFollowingUserIds(viewerUserId);
+        if (followingIds.isEmpty()) return 0L;
+
+        Criteria criteria = Criteria.where("createdUser").in(followingIds)
+                .and("draft").ne(true)
+                .and("isDeleted").ne(true)
+                .and("disclose").is(true);
+        if (since != null) {
+            criteria = criteria.and("updated").gte(since);
+        }
+        return mongoTemplate.count(new Query(criteria), Documents.class);
     }
 }
 

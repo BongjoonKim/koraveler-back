@@ -24,8 +24,10 @@ public class CommonServiceImpl implements CommonService {
     private String weatherKey;
 
     private static final int TIMEOUT_MS = 5000;
+    // 실제 브라우저 UA. naver.me, instagram, twitter 등은 봇 UA에 og 메타가 빈 미니멀 페이지를 줌.
     private static final String USER_AGENT =
-            "Mozilla/5.0 (compatible; NadelivBot/1.0; +https://www.koraveler.com)";
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 " +
+            "(KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36";
 
     @Override
     public String getWeatherData() throws Exception {
@@ -51,10 +53,20 @@ public class CommonServiceImpl implements CommonService {
 
         Document doc = Jsoup.connect(url)
                 .userAgent(USER_AGENT)
+                .header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
+                .header("Accept-Language", "ko,en-US;q=0.9,en;q=0.8")
                 .timeout(TIMEOUT_MS)
                 .followRedirects(true)
                 .ignoreHttpErrors(false)
                 .get();
+
+        // redirect 이후 최종 URL을 base로 사용해야 상대 경로(og:image 등)가 올바르게 풀림.
+        URI baseUri;
+        try {
+            baseUri = new URI(doc.location());
+        } catch (Exception e) {
+            baseUri = uri;
+        }
 
         String title = firstNonEmpty(
                 metaContent(doc, "meta[property=og:title]"),
@@ -75,17 +87,17 @@ public class CommonServiceImpl implements CommonService {
 
         String siteName = firstNonEmpty(
                 metaContent(doc, "meta[property=og:site_name]"),
-                uri.getHost()
+                baseUri.getHost()
         );
 
         String favicon = firstNonEmpty(
                 linkHref(doc, "link[rel~=(?i)^(shortcut icon|icon|apple-touch-icon)$]"),
-                scheme + "://" + uri.getHost() + "/favicon.ico"
+                baseUri.getScheme() + "://" + baseUri.getHost() + "/favicon.ico"
         );
 
-        // 상대 URL 보정
-        image = absolutize(image, uri);
-        favicon = absolutize(favicon, uri);
+        // 상대 URL 보정 — redirect 후의 최종 URL 기준
+        image = absolutize(image, baseUri);
+        favicon = absolutize(favicon, baseUri);
 
         return OgMetadataDTO.builder()
                 .url(url)

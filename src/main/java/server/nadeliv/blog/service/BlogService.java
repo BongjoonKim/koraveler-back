@@ -3,6 +3,7 @@ package server.nadeliv.blog.service;
 import server.nadeliv.blog.dto.DocumentsDTO;
 import server.nadeliv.blog.dto.DocumentsInfo;
 import server.nadeliv.blog.dto.PaginationDTO;
+import server.nadeliv.blog.dto.PopularPostDTO;
 import server.nadeliv.blog.model.Documents;
 
 import java.time.LocalDateTime;
@@ -40,4 +41,18 @@ public interface BlogService {
 
     // Featured 히스토리
     DocumentsInfo getFeaturedHistory(int page, int size);
+
+    // ========== Popular Posts (사이드바 위젯) ==========
+    // 기간 내 조회수 기준 인기 글 Top N
+    // @param period "day" | "week" | "month" | "all"
+    // @param limit 반환 개수 (예: 3)
+    List<PopularPostDTO> getPopularPosts(String period, int limit);
+
+    // ========== Following Feed ==========
+    // viewerUserId 가 팔로우 중인 사용자들이 작성한 발행 글 페이지네이션
+    DocumentsInfo getFollowingFeed(String viewerUserId, PaginationDTO pageDTO);
+
+    // viewerUserId 가 팔로우 중인 사용자의 글 중, since 시점 이후 발행/수정된 글 수.
+    // 사이드바 Following 탭 뱃지에 사용.
+    long countFollowingFeedSince(String viewerUserId, LocalDateTime since);
 }
