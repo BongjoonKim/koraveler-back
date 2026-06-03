@@ -1,7 +1,7 @@
-# Koraveler Backend 개발 가이드
+# Nadeliv Backend 개발 가이드
 
 ## 1. 프로젝트 개요
-한국 여행 블로그 플랫폼 Koraveler 백엔드. Google AdSense 수익화 목표.
+한국 여행 블로그 플랫폼 Nadeliv 백엔드. Google AdSense 수익화 목표.
 
 ## 2. 기술 스택
 - Spring Boot 3.2.5
@@ -14,7 +14,7 @@
 
 ## 3. 프로젝트 구조
 ```
-src/main/java/server/koraveler/
+src/main/java/server/nadeliv/
 ├── config/                     # 설정 클래스
 │   ├── SecurityConfig.java
 │   ├── CorsConfig.java
@@ -60,7 +60,7 @@ src/main/java/server/koraveler/
 
 ### 4.1 Model (MongoDB Document)
 ```java
-package server.koraveler.blog.model;
+package server.nadeliv.blog.model;
 
 import lombok.*;
 import org.springframework.data.annotation.Id;
@@ -68,7 +68,7 @@ import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 import org.springframework.data.mongodb.core.mapping.Field;
 import org.springframework.data.mongodb.core.mapping.FieldType;
-import server.koraveler.common.dto.CommonDTO;
+import server.nadeliv.common.dto.CommonDTO;
 
 @Document(collection = "entity_names")  // 복수형 스네이크케이스
 @Data
@@ -105,7 +105,7 @@ public class EntityName extends CommonDTO {
 
 ### 4.2 DTO
 ```java
-package server.koraveler.blog.dto;
+package server.nadeliv.blog.dto;
 
 import lombok.*;
 import java.time.LocalDateTime;
@@ -137,14 +137,14 @@ public class EntityDTO {
 
 ### 4.3 Repository
 ```java
-package server.koraveler.blog.repo;
+package server.nadeliv.blog.repo;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.data.mongodb.repository.Query;
 import org.springframework.stereotype.Repository;
-import server.koraveler.blog.model.Entity;
+import server.nadeliv.blog.model.Entity;
 
 import java.util.List;
 import java.util.Optional;
@@ -185,11 +185,11 @@ public interface EntityRepo extends MongoRepository<Entity, String> {
 
 ### 4.4 Service Interface
 ```java
-package server.koraveler.blog.service;
+package server.nadeliv.blog.service;
 
 import org.springframework.data.domain.Pageable;
-import server.koraveler.blog.dto.EntityDTO;
-import server.koraveler.blog.dto.EntityPageDTO;
+import server.nadeliv.blog.dto.EntityDTO;
+import server.nadeliv.blog.dto.EntityPageDTO;
 
 import java.util.List;
 
@@ -219,7 +219,7 @@ public interface EntityService {
 
 ### 4.5 Service Implementation
 ```java
-package server.koraveler.blog.service.serviceImpl;
+package server.nadeliv.blog.service.serviceImpl;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -227,10 +227,10 @@ import org.springframework.beans.BeanUtils;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
-import server.koraveler.blog.dto.EntityDTO;
-import server.koraveler.blog.model.Entity;
-import server.koraveler.blog.repo.EntityRepo;
-import server.koraveler.blog.service.EntityService;
+import server.nadeliv.blog.dto.EntityDTO;
+import server.nadeliv.blog.model.Entity;
+import server.nadeliv.blog.repo.EntityRepo;
+import server.nadeliv.blog.service.EntityService;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -354,7 +354,7 @@ public class EntityServiceImpl implements EntityService {
 
 ### 4.6 Controller
 ```java
-package server.koraveler.blog.controller;
+package server.nadeliv.blog.controller;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -365,9 +365,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
-import server.koraveler.blog.dto.EntityDTO;
-import server.koraveler.blog.service.EntityService;
-import server.koraveler.users.dto.CustomUserDetails;
+import server.nadeliv.blog.dto.EntityDTO;
+import server.nadeliv.blog.service.EntityService;
+import server.nadeliv.users.dto.CustomUserDetails;
 
 @RestController
 @RequestMapping("/api/v1/entities")
@@ -669,7 +669,7 @@ Page<Entity> findByParentIdAndDeletedFalse(String parentId, Pageable pageable);
 
 ### 10.1 CustomException + ErrorCode (권장 — Travel, Chat 모듈)
 ```java
-// ErrorCode enum 정의 (server.koraveler.error.ErrorCode)
+// ErrorCode enum 정의 (server.nadeliv.error.ErrorCode)
 TRAVEL_NOT_FOUND(HttpStatus.NOT_FOUND, "TRV_001", "여행 프로젝트를 찾을 수 없습니다"),
 NOT_TRAVEL_MEMBER(HttpStatus.NOT_FOUND, "TRV_006", "여행 멤버가 아닙니다"),
 TRAVEL_CHANNEL_NOT_FOUND(HttpStatus.NOT_FOUND, "TRV_015", "여행 채널을 찾을 수 없습니다"),

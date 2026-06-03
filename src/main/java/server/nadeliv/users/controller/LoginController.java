@@ -88,6 +88,8 @@ public class LoginController{
         try {
             UsersDTO newUsersDTO = loginService.createUser(usersDTO);
             return ResponseEntity.ok(newUsersDTO);
+        } catch (CustomException e) {
+            return new ResponseEntity<>(e.toErrorResponse(), e.getStatus());
         } catch (Exception e) {
             return new ResponseEntity<>(e.getMessage(), HttpStatus.EXPECTATION_FAILED);
         }

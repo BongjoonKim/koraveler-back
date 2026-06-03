@@ -5,13 +5,16 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
+import server.nadeliv.users.dto.CustomUserDetails;
 import org.springframework.web.server.ResponseStatusException;
 import server.nadeliv.blog.dto.DocumentsDTO;
 import server.nadeliv.blog.dto.DocumentsInfo;
 import server.nadeliv.blog.dto.FeaturedRequest;
 import server.nadeliv.blog.dto.PaginationDTO;
+import server.nadeliv.blog.dto.PopularPostDTO;
 import server.nadeliv.blog.model.Documents;
 import server.nadeliv.blog.service.BlogService;
 
@@ -138,6 +141,21 @@ public class BlogController {
         }
     }
 
+    // 휴지통에서 복구 (인증 필요)
+    @PatchMapping("/document/{id}/restore")
+    public ResponseEntity<?> restoreDocument(@PathVariable("id") String id) {
+        try {
+            blogService.restoreDocument(id);
+            Map<String, String> result = new HashMap<>();
+            result.put("id", id);
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            log.error("Restore failed for document {}", id, e);
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body("restore failed: " + e.getMessage());
+        }
+    }
+
 
     /**
      * 일반 글을 Featured로 설정 (관리자용)
@@ -231,6 +249,52 @@ public class BlogController {
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("조회 실패");
+        }
+    }
+
+    /**
+     * Following 피드: 내가 팔로우 중인 사용자들의 발행 글 목록 (인증 필요).
+     */
+    @GetMapping("/following")
+    public ResponseEntity<?> getFollowingFeed(
+            @RequestParam("page") int page,
+            @RequestParam("size") int size,
+            @RequestParam(value = "dateSort", required = false) String dateSort,
+            @RequestParam(value = "locale", required = false) String locale,
+            @AuthenticationPrincipal CustomUserDetails userDetails
+    ) {
+        if (userDetails == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("로그인이 필요합니다");
+        }
+        try {
+            DocumentsInfo feed = blogService.getFollowingFeed(
+                    userDetails.getUsername(),
+                    new PaginationDTO(page, size, null, null, dateSort, locale)
+            );
+            return ResponseEntity.ok(feed);
+        } catch (Exception e) {
+            log.error("Following 피드 조회 실패", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Following 피드 조회 실패");
+        }
+    }
+
+    /**
+     * 인기 글 Top N (사이드바 위젯용, 비인증 허용)
+     * period: day | week | month | all (기본 month)
+     * limit: 1~20 (기본 3)
+     */
+    @GetMapping("/ps/popular")
+    public ResponseEntity<?> getPopularPosts(
+            @RequestParam(defaultValue = "month") String period,
+            @RequestParam(defaultValue = "3") int limit
+    ) {
+        try {
+            List<PopularPostDTO> popular = blogService.getPopularPosts(period, limit);
+            return ResponseEntity.ok(popular);
+        } catch (Exception e) {
+            log.error("Popular posts 조회 실패", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Popular posts 조회 실패");
         }
     }
 

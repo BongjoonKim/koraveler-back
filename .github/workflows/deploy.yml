@@ -169,6 +169,9 @@ jobs:
                 static: ap-northeast-2
               bedrock:
                 model-id: ${AWS_BEDROCK_MODEL_ID}
+              ses:
+                region: ap-northeast-2
+                from-email: noreply@nadeliv.com
 
           # 액추에이터 설정 (헬스체크용)
           management:

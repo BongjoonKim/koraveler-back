@@ -85,6 +85,71 @@ public class S3Service {
         }
     }
 
+    /**
+     * S3 URL에서 버킷명과 key를 모두 추출해 삭제.
+     * BUCKET_NAME 하드코딩에 의존하지 않으므로 haries-img/haries-thumbnail 등
+     * 임의의 버킷에 있는 객체를 삭제할 때 사용.
+     */
+    public void deleteFileByUrl(String fileUrl) {
+        if (fileUrl == null || fileUrl.isBlank()) {
+            return;
+        }
+        try {
+            S3UrlParts parts = parseS3Url(fileUrl);
+            if (parts == null) {
+                log.warn("S3 URL parse failed, skipping delete: {}", fileUrl);
+                return;
+            }
+            DeleteObjectRequest deleteObjectRequest = DeleteObjectRequest.builder()
+                    .bucket(parts.bucket)
+                    .key(parts.key)
+                    .build();
+            s3Client.deleteObject(deleteObjectRequest);
+            log.info("S3 delete success: bucket={}, key={}", parts.bucket, parts.key);
+        } catch (Exception e) {
+            log.error("S3 deleteByUrl failed for {}: {}", fileUrl, e.getMessage());
+        }
+    }
+
+    private record S3UrlParts(String bucket, String key) {}
+
+    /**
+     * 지원 형식:
+     *  - https://{bucket}.s3.{region}.amazonaws.com/{key}
+     *  - https://{bucket}.s3.amazonaws.com/{key}
+     *  - https://s3.{region}.amazonaws.com/{bucket}/{key}
+     */
+    private S3UrlParts parseS3Url(String url) {
+        try {
+            java.net.URI uri = java.net.URI.create(url);
+            String host = uri.getHost();
+            String path = uri.getPath() != null ? uri.getPath() : "";
+            if (path.startsWith("/")) {
+                path = path.substring(1);
+            }
+            if (host == null) return null;
+
+            // virtual-hosted style: {bucket}.s3...
+            int s3Idx = host.indexOf(".s3");
+            if (s3Idx > 0) {
+                String bucket = host.substring(0, s3Idx);
+                if (path.isEmpty()) return null;
+                return new S3UrlParts(bucket, path);
+            }
+            // path-style: s3.region.amazonaws.com/{bucket}/{key}
+            if (host.startsWith("s3")) {
+                int slash = path.indexOf('/');
+                if (slash <= 0) return null;
+                String bucket = path.substring(0, slash);
+                String key = path.substring(slash + 1);
+                return new S3UrlParts(bucket, key);
+            }
+            return null;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
     private void validateMediaType(MultipartFile file) {
         String contentType = file.getContentType();
         if (contentType == null || (!contentType.startsWith("image/") && !contentType.startsWith("video/"))) {

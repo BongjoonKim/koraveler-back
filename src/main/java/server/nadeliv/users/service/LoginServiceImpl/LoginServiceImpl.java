@@ -13,11 +13,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.ObjectUtils;
 import org.springframework.util.StringUtils;
 import server.nadeliv.error.CustomException;
+import server.nadeliv.error.ErrorCode;
 import server.nadeliv.users.dto.CustomUserDetails;
 import server.nadeliv.users.dto.TokenDTO;
 import server.nadeliv.users.dto.UsersDTO;
 import server.nadeliv.users.model.Users;
 import server.nadeliv.users.repo.UsersRepo;
+import server.nadeliv.users.service.EmailVerificationService;
 import server.nadeliv.users.service.LoginService;
 import server.nadeliv.utils.JwtUtil;
 
@@ -39,6 +41,9 @@ public class LoginServiceImpl implements LoginService {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
+    @Autowired
+    private EmailVerificationService emailVerificationService;
+
     private Users findUserByUserId(String userId) {
         return usersRepo.findByUserId(userId);
     }
@@ -46,15 +51,20 @@ public class LoginServiceImpl implements LoginService {
     @Override
     public UsersDTO createUser(UsersDTO usersDTO) throws Exception {
         try {
+            // 이메일 인증 여부 확인
+            if (!emailVerificationService.isVerified(usersDTO.getEmail())) {
+                throw new CustomException(ErrorCode.EMAIL_NOT_VERIFIED);
+            }
+
             // validation 체크
             Users existingUser = usersRepo.findByUserId(usersDTO.getUserId());
             if (!ObjectUtils.isEmpty(existingUser)) {
-                throw new Exception("이미 존재하는 ID입니다");
+                throw new CustomException(ErrorCode.USER_ALREADY_EXISTS, "이미 존재하는 ID입니다");
             }
 
             existingUser = usersRepo.findByEmail(usersDTO.getEmail());
             if (!ObjectUtils.isEmpty(existingUser)) {
-                throw new Exception("이미 존재하는 이메일입니다");
+                throw new CustomException(ErrorCode.EMAIL_ALREADY_EXISTS);
             }
 
             LocalDateTime now = LocalDateTime.now();
@@ -71,9 +81,11 @@ public class LoginServiceImpl implements LoginService {
             newUser.setAuthorities(Arrays.asList("user"));
             newUser.setCreated(now);
             newUser.setUpdated(now);
-            // isEnabled 등은 이미 true로 초기화되어 있음
 
             Users savedUser = usersRepo.save(newUser);
+
+            // 회원가입 성공 시 인증 완료 플래그 삭제
+            emailVerificationService.clearVerified(usersDTO.getEmail());
 
             UsersDTO responseDTO = new UsersDTO();
             BeanUtils.copyProperties(savedUser, responseDTO);
@@ -81,6 +93,8 @@ public class LoginServiceImpl implements LoginService {
 
             return responseDTO;
 
+        } catch (CustomException e) {
+            throw e;
         } catch (Exception e) {
             throw e;
         }
