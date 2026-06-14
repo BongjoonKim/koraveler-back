@@ -18,13 +18,16 @@ public class EmailServiceImpl implements EmailService {
     @Value("${cloud.aws.ses.from-email}")
     private String fromEmail;
 
+    @Value("${cloud.aws.ses.configuration-set:}")
+    private String configurationSet;
+
     @Override
     public void sendVerificationCode(String toEmail, String code) {
-        String subject = "[Koraveler] 이메일 인증 코드 / Email Verification Code";
+        String subject = "[Nadeliv] 이메일 인증 코드 / Email Verification Code";
         String htmlBody = buildVerificationHtml(code);
 
         try {
-            SendEmailRequest request = SendEmailRequest.builder()
+            SendEmailRequest.Builder requestBuilder = SendEmailRequest.builder()
                     .source(fromEmail)
                     .destination(Destination.builder()
                             .toAddresses(toEmail)
@@ -40,10 +43,14 @@ public class EmailServiceImpl implements EmailService {
                                             .data(htmlBody)
                                             .build())
                                     .build())
-                            .build())
-                    .build();
+                            .build());
 
-            sesClient.sendEmail(request);
+            // configuration set이 설정된 경우에만 지정 → SES 이벤트 퍼블리싱(바운스/불만 SNS 발행)에 사용
+            if (configurationSet != null && !configurationSet.isBlank()) {
+                requestBuilder.configurationSetName(configurationSet);
+            }
+
+            sesClient.sendEmail(requestBuilder.build());
             log.info("인증 코드 이메일 발송 완료: {}", toEmail);
         } catch (SesException e) {
             log.error("이메일 발송 실패: {} - {}", toEmail, e.awsErrorDetails().errorMessage());
@@ -63,7 +70,7 @@ public class EmailServiceImpl implements EmailService {
                         <!-- Header -->
                         <tr>
                           <td style="background:linear-gradient(135deg,#4F46E5,#7C3AED);padding:32px;text-align:center;">
-                            <h1 style="margin:0;color:#ffffff;font-size:24px;">Koraveler</h1>
+                            <h1 style="margin:0;color:#ffffff;font-size:24px;">Nadeliv</h1>
                             <p style="margin:8px 0 0;color:rgba(255,255,255,0.85);font-size:14px;">이메일 인증 / Email Verification</p>
                           </td>
                         </tr>

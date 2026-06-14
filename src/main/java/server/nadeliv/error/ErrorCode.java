@@ -25,6 +25,11 @@ public enum ErrorCode {
     EMAIL_VERIFY_ATTEMPTS_EXCEEDED(HttpStatus.TOO_MANY_REQUESTS, "USER_009", "인증 시도 횟수를 초과했습니다"),
     EMAIL_CODE_EXPIRED(HttpStatus.BAD_REQUEST, "USER_010", "인증 코드가 만료되었거나 존재하지 않습니다"),
     EMAIL_CODE_MISMATCH(HttpStatus.BAD_REQUEST, "USER_011", "인증 코드가 일치하지 않습니다"),
+    EMAIL_INVALID_FORMAT(HttpStatus.BAD_REQUEST, "USER_012", "이메일 형식이 올바르지 않습니다"),
+    EMAIL_UNDELIVERABLE(HttpStatus.BAD_REQUEST, "USER_013", "수신할 수 없는 이메일 주소입니다 (도메인을 확인해주세요)"),
+    EMAIL_RESEND_COOLDOWN(HttpStatus.TOO_MANY_REQUESTS, "USER_014", "잠시 후 다시 시도해주세요"),
+    EMAIL_IP_RATE_EXCEEDED(HttpStatus.TOO_MANY_REQUESTS, "USER_015", "요청이 너무 많습니다. 잠시 후 다시 시도해주세요"),
+    EMAIL_IP_DISTINCT_EXCEEDED(HttpStatus.TOO_MANY_REQUESTS, "USER_016", "요청이 너무 많습니다. 잠시 후 다시 시도해주세요"),
 
     // ============= 메시지 관련 에러 (MSG) =============
     MESSAGE_NOT_FOUND(HttpStatus.NOT_FOUND, "MSG_001", "메시지를 찾을 수 없습니다"),

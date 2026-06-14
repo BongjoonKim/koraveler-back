@@ -1,5 +1,6 @@
 package server.nadeliv.users.controller;
 
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -7,6 +8,7 @@ import org.springframework.web.bind.annotation.*;
 import server.nadeliv.users.dto.EmailCodeVerifyRequest;
 import server.nadeliv.users.dto.EmailVerificationRequest;
 import server.nadeliv.users.service.EmailVerificationService;
+import server.nadeliv.utils.HttpRequestUtils;
 
 import java.util.Map;
 
@@ -22,8 +24,12 @@ public class EmailVerificationController {
      * 인증 코드 발송 (비인증, ps 경로)
      */
     @PostMapping("/ps/send-verification-code")
-    public ResponseEntity<?> sendVerificationCode(@RequestBody EmailVerificationRequest request) {
-        emailVerificationService.sendCode(request.getEmail());
+    public ResponseEntity<?> sendVerificationCode(
+            @RequestBody EmailVerificationRequest request,
+            HttpServletRequest httpRequest) {
+        String clientIp = HttpRequestUtils.getClientIp(httpRequest);
+        String userAgent = HttpRequestUtils.getUserAgent(httpRequest);
+        emailVerificationService.sendCode(request.getEmail(), clientIp, userAgent);
         return ResponseEntity.ok(Map.of(
                 "success", true,
                 "message", "인증 코드가 발송되었습니다."
