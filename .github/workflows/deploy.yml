@@ -42,6 +42,9 @@ jobs:
           AWS_ACCESS_KEY: ${{ secrets.AWS_ACCESS_KEY }}
           AWS_SECRET_KEY: ${{ secrets.AWS_SECRET_KEY }}
           AWS_BEDROCK_MODEL_ID: ${{ secrets.AWS_BEDROCK_MODEL_ID }}
+          SES_SNS_SECRET_TOKEN: ${{ secrets.SES_SNS_SECRET_TOKEN }}
+          SES_SNS_TOPIC_ARN: ${{ secrets.SES_SNS_TOPIC_ARN }}
+          SES_CONFIGURATION_SET: ${{ secrets.SES_CONFIGURATION_SET }}
         run: |
           # SSH 키 설정
           echo "$PRIVATE_KEY" > private_key.pem
@@ -173,6 +176,10 @@ jobs:
               ses:
                 region: ap-northeast-2
                 from-email: noreply@nadeliv.com
+                configuration-set: "${SES_CONFIGURATION_SET}"
+                notifications:
+                  secret-token: "${SES_SNS_SECRET_TOKEN}"
+                  allowed-topic-arn: "${SES_SNS_TOPIC_ARN}"
 
           # 액추에이터 설정 (헬스체크용)
           management:

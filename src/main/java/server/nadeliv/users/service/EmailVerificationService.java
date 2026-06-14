@@ -1,8 +1,8 @@
 package server.nadeliv.users.service;
 
 public interface EmailVerificationService {
-    // 인증 코드 발송
-    void sendCode(String email);
+    // 인증 코드 발송 (요청자 IP/User-Agent 포함 — rate limit & 감사 로깅용)
+    void sendCode(String email, String clientIp, String userAgent);
 
     // 인증 코드 검증
     boolean verifyCode(String email, String code);
