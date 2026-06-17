@@ -50,6 +50,8 @@ public class BlogController {
         try {
             DocumentsDTO documentsDTO = blogService.createAfterSaveDocument(data);
             return ResponseEntity.ok(documentsDTO);
+        } catch (ResponseStatusException e) {
+            throw e;
         } catch (Exception e) {
             return null;
         }
@@ -62,6 +64,8 @@ public class BlogController {
         try {
             DocumentsDTO documentsDTO = blogService.saveDocument(data);
             return ResponseEntity.ok(documentsDTO);
+        } catch (ResponseStatusException e) {
+            throw e;
         } catch (Exception e) {
             return null;
         }
@@ -135,6 +139,8 @@ public class BlogController {
             Map<String, String> docId = new HashMap<>();
             docId.put("id", id);
             return ResponseEntity.ok(docId);
+        } catch (ResponseStatusException e) {
+            throw e;
         } catch (Exception e) {
             e.printStackTrace();
             return null;

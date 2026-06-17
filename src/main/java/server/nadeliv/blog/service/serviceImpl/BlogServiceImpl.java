@@ -10,6 +10,8 @@ import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.support.PageableExecutionUtils;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -269,39 +271,54 @@ public class BlogServiceImpl implements BlogService {
     @Override
     public DocumentsDTO saveDocument(DocumentsDTO documentsDTO) {
         try {
+            // 로그인 필수
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            if (authentication == null || !(authentication.getPrincipal() instanceof UserDetails)) {
+                throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "authentication required");
+            }
+            String username = ((UserDetails) authentication.getPrincipal()).getUsername();
+
+            // 기존 문서 로드 후 작성자 본인 여부 검증 (남의 글 수정 차단)
+            Documents existing = (documentsDTO.getId() != null)
+                    ? blogsRepo.findById(documentsDTO.getId()).orElse(null)
+                    : null;
+            if (existing != null && existing.getCreatedUser() != null
+                    && !username.equals(existing.getCreatedUser())) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "not allowed to edit this document");
+            }
+
             Documents documents = new Documents();
             BeanUtils.copyProperties(documentsDTO, documents);
             LocalDateTime now = LocalDateTime.now();
-
             documents.setUpdated(now);
+            documents.setUpdatedUser(username);
 
-            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-            if (authentication != null && authentication.getPrincipal() != null) {
-                UserDetails userDetails = (UserDetails) authentication.getPrincipal();
-                System.out.println("userDetails = " + userDetails);
-                String username = userDetails.getUsername();
-                documents.setUpdatedUser(username);
-                if (documents.getFolderId() == null) {
-                    Users users = usersRepo.findByUserId(username);
-                    documents.setFolderId(users.getId());
-                }
-                Documents afterDocument = blogsRepo.save(documents);
-
-                // i18n: 발행된 글(draft가 아닌)이면 자동 번역 큐잉
-                if (!afterDocument.isDraft()) {
-                    try {
-                        i18nTranslationService.queueTranslations(afterDocument);
-                    } catch (Exception e) {
-                        log.warn("번역 큐잉 실패 (글 저장은 성공): {}", e.getMessage());
-                    }
-                }
-
-                DocumentsDTO newDocDTO = new DocumentsDTO();
-                BeanUtils.copyProperties(afterDocument, newDocDTO);
-
-                return newDocDTO;
+            // 작성자/생성시각/휴지통 상태는 DTO로 위조하지 못하도록 기존 값 보존
+            if (existing != null) {
+                documents.setCreatedUser(existing.getCreatedUser());
+                documents.setCreated(existing.getCreated());
+                documents.setDeleted(existing.isDeleted());
+                documents.setDeletedAt(existing.getDeletedAt());
             }
-            return null;
+
+            if (documents.getFolderId() == null) {
+                Users users = usersRepo.findByUserId(username);
+                documents.setFolderId(users.getId());
+            }
+            Documents afterDocument = blogsRepo.save(documents);
+
+            // i18n: 발행된 글(draft가 아닌)이면 자동 번역 큐잉
+            if (!afterDocument.isDraft()) {
+                try {
+                    i18nTranslationService.queueTranslations(afterDocument);
+                } catch (Exception e) {
+                    log.warn("번역 큐잉 실패 (글 저장은 성공): {}", e.getMessage());
+                }
+            }
+
+            DocumentsDTO newDocDTO = new DocumentsDTO();
+            BeanUtils.copyProperties(afterDocument, newDocDTO);
+            return newDocDTO;
         } catch (Exception e) {
             throw e;
         }
@@ -520,11 +537,25 @@ public class BlogServiceImpl implements BlogService {
 
     @Override
     public DocumentsDTO createAfterSaveDocument(DocumentsDTO newData) {
-        LocalDateTime now = LocalDateTime.now();
-        Documents documents = blogsRepo.findById(newData.getId()).get();
+        // 로그인 필수
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !(authentication.getPrincipal() instanceof UserDetails)) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "authentication required");
+        }
+        String username = ((UserDetails) authentication.getPrincipal()).getUsername();
+
+        Documents documents = blogsRepo.findById(newData.getId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "document not found"));
+
+        // 작성자 본인만 수정 가능
+        if (documents.getCreatedUser() != null && !username.equals(documents.getCreatedUser())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "not allowed to edit this document");
+        }
 
         documents.setContents(newData.getContents());
         documents.setThumbnailImgUrl(newData.getThumbnailImgUrl());
+        documents.setUpdated(LocalDateTime.now());
+        documents.setUpdatedUser(username);
 
         Documents newDocument = blogsRepo.save(documents);
         DocumentsDTO newDocumentDTO = new DocumentsDTO();
@@ -564,13 +595,18 @@ public class BlogServiceImpl implements BlogService {
                     ? ((UserDetails) authentication.getPrincipal()).getUsername()
                     : null;
 
-            Documents document = blogsRepo.findById(id)
-                    .orElseThrow(() -> new Exception("document not found: " + id));
+            // 반드시 로그인해야 삭제 가능 (익명 삭제 차단)
+            if (username == null) {
+                throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "authentication required");
+            }
 
-            // 본인 글이거나 인증되지 않은 호출(현재 /ps/document 경로 호환)일 때만 진행.
-            if (username != null && document.getCreatedUser() != null
+            Documents document = blogsRepo.findById(id)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "document not found: " + id));
+
+            // 작성자 본인만 삭제 가능
+            if (document.getCreatedUser() != null
                     && !username.equals(document.getCreatedUser())) {
-                throw new Exception("not allowed to delete this document");
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "not allowed to delete this document");
             }
 
             LocalDateTime now = LocalDateTime.now();

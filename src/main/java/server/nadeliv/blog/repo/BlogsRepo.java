@@ -24,6 +24,10 @@ public interface BlogsRepo extends MongoRepository<Documents, String> {
     // 휴지통 자동 정리: deletedAt이 임계 시점보다 이전인 soft-deleted 문서 조회
     List<Documents> findByIsDeletedTrueAndDeletedAtBefore(LocalDateTime threshold);
 
+    // 발행 글(draft != true) 중 휴지통 제외(isDeleted != true).
+    // ⚠️ 파생 쿼리 이름은 And가 Or보다 먼저 묶여 (draft=false) OR (draft=null AND isDeleted=false) 로
+    // 파싱되어, 발행 글의 soft delete가 무시되는 버그가 있었음. 명시적 @Query로 isDeleted를 항상 적용.
+    @Query("{ 'draft': { $ne: true }, 'isDeleted': { $ne: true } }")
     Page<Documents> findAllByDraftIsFalseOrDraftIsNullAndIsDeletedFalse(Pageable pageable);
     @Query("{ 'disclose': true, 'isDeleted': { '$ne': true }, '$or': [ " +
             "{ 'title': { '$regex': ?0, '$options': 'i' } }, " +
