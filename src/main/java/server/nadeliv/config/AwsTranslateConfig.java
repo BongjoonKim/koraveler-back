@@ -3,8 +3,7 @@ package server.nadeliv.config;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
-import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
+import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
 import software.amazon.awssdk.core.client.config.ClientOverrideConfiguration;
 import software.amazon.awssdk.core.retry.RetryPolicy;
 import software.amazon.awssdk.http.urlconnection.UrlConnectionHttpClient;
@@ -17,12 +16,6 @@ import java.time.Duration;
 @Configuration
 public class AwsTranslateConfig {
 
-    @Value("${cloud.aws.credentials.access-key}")
-    private String accessKey;
-
-    @Value("${cloud.aws.credentials.secret-key}")
-    private String secretKey;
-
     @Value("${cloud.aws.region.static:ap-northeast-2}")
     private String region;
 
@@ -30,9 +23,7 @@ public class AwsTranslateConfig {
     public TranslateClient translateClient() {
         return TranslateClient.builder()
                 .region(Region.of(region))
-                .credentialsProvider(StaticCredentialsProvider.create(
-                        AwsBasicCredentials.create(accessKey, secretKey)
-                ))
+                .credentialsProvider(DefaultCredentialsProvider.create())
                 .build();
     }
 
@@ -40,9 +31,7 @@ public class AwsTranslateConfig {
     public BedrockRuntimeClient bedrockRuntimeClient() {
         return BedrockRuntimeClient.builder()
                 .region(Region.of(region))
-                .credentialsProvider(StaticCredentialsProvider.create(
-                        AwsBasicCredentials.create(accessKey, secretKey)
-                ))
+                .credentialsProvider(DefaultCredentialsProvider.create())
                 .httpClient(UrlConnectionHttpClient.builder()
                         .socketTimeout(Duration.ofMinutes(3))
                         .connectionTimeout(Duration.ofSeconds(10))
