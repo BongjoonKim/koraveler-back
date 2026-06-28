@@ -90,6 +90,9 @@ public enum ErrorCode {
     TRAVEL_CHANNEL_NOT_FOUND(HttpStatus.NOT_FOUND, "TRV_015", "여행 채널을 찾을 수 없습니다"),
     CHANNEL_ALREADY_LINKED(HttpStatus.CONFLICT, "TRV_016", "이미 연결된 채널입니다"),
 
+    // ============= 파일 에러 (FILE) =============
+    INVALID_FILE_KEY(HttpStatus.BAD_REQUEST, "FILE_001", "허용되지 않은 파일 경로입니다"),
+
     // ============= 일반 에러 (GEN) =============
     INVALID_INPUT(HttpStatus.BAD_REQUEST, "GEN_001", "Invalid input / 잘못된 입력값입니다"),
     NOT_FOUND(HttpStatus.NOT_FOUND, "GEN_002", "Resource not found"),
