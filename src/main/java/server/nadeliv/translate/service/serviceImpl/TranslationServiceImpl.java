@@ -14,8 +14,7 @@ import server.nadeliv.translate.model.enums.ExportFormat;
 import server.nadeliv.translate.repo.TranslationHistoryCustomRepo;
 import server.nadeliv.translate.repo.TranslationHistoryRepo;
 import server.nadeliv.translate.service.TranslationService;
-import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
-import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
+import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.bedrockruntime.BedrockRuntimeClient;
 import software.amazon.awssdk.services.bedrockruntime.model.ContentBlock;
@@ -42,12 +41,6 @@ public class TranslationServiceImpl implements TranslationService {
     private final TranslationHistoryRepo translationHistoryRepo;
     private final TranslationHistoryCustomRepo translationHistoryCustomRepo;
     private final ObjectMapper objectMapper = new ObjectMapper();
-
-    @Value("${cloud.aws.credentials.access-key}")
-    private String awsAccessKey;
-
-    @Value("${cloud.aws.credentials.secret-key}")
-    private String awsSecretKey;
 
     @Value("${cloud.aws.region.static}")
     private String awsRegion;
@@ -126,9 +119,7 @@ public class TranslationServiceImpl implements TranslationService {
         try {
             BedrockRuntimeClient bedrockClient = BedrockRuntimeClient.builder()
                     .region(Region.of(awsRegion))
-                    .credentialsProvider(StaticCredentialsProvider.create(
-                            AwsBasicCredentials.create(awsAccessKey, awsSecretKey)
-                    ))
+                    .credentialsProvider(DefaultCredentialsProvider.create())
                     .build();
 
             String systemPrompt = String.format(

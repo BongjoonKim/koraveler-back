@@ -39,8 +39,6 @@ jobs:
           NAVER_MAP_CLIENT_SECRET: ${{ secrets.NAVER_MAP_CLIENT_SECRET }}
           KAKAO_API_KEY: ${{ secrets.KAKAO_API_KEY }}
           REDIS_HOST: ${{secrets.REDIS_HOST}}
-          AWS_ACCESS_KEY: ${{ secrets.AWS_ACCESS_KEY }}
-          AWS_SECRET_KEY: ${{ secrets.AWS_SECRET_KEY }}
           AWS_BEDROCK_MODEL_ID: ${{ secrets.AWS_BEDROCK_MODEL_ID }}
           SES_SNS_SECRET_TOKEN: ${{ secrets.SES_SNS_SECRET_TOKEN }}
           SES_SNS_TOPIC_ARN: ${{ secrets.SES_SNS_TOPIC_ARN }}
@@ -166,9 +164,6 @@ jobs:
           
           cloud:
             aws:
-              credentials:
-                access-key: ${AWS_ACCESS_KEY}
-                secret-key: ${AWS_SECRET_KEY}
               region:
                 static: ap-northeast-2
               bedrock:
