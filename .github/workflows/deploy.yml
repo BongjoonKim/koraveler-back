@@ -125,6 +125,10 @@ jobs:
           spring:
             application:
               name: nadeliv
+            servlet:
+              multipart:
+                max-file-size: 500MB
+                max-request-size: 800MB
             data:
               mongodb:
                 host: 3.36.175.230
