@@ -1,0 +1,9 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="NadelivApplication" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot">
+    <module name="nadeliv.main" />
+    <option name="SPRING_BOOT_MAIN_CLASS" value="server.nadeliv.NadelivApplication" />
+    <method v="2">
+      <option name="Make" enabled="true" />
+    </method>
+  </configuration>
+</component>
