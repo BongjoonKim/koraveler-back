@@ -70,4 +70,9 @@ public interface BlogsRepo extends MongoRepository<Documents, String> {
 
     // Featured 설정된 모든 글 (히스토리용)
     Page<Documents> findByFeaturedReadyTrueAndIsDeletedFalse(Pageable pageable);
+
+    // sitemap.xml 용: 발행·공개 글만, 필요한 필드만 프로젝션
+    @Query(value = "{ 'draft': { $ne: true }, 'isDeleted': { $ne: true }, 'disclose': { $ne: false } }",
+            fields = "{ '_id': 1, 'updated': 1, 'created': 1, 'originalLocale': 1 }")
+    List<Documents> findAllForSitemap();
 }

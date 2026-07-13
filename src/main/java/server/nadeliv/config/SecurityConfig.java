@@ -78,6 +78,8 @@ public class SecurityConfig {
                     .requestMatchers(HttpMethod.GET, "/api/v1/tags/**").permitAll()
                     // 댓글 조회 API (비인증 허용)
                     .requestMatchers(HttpMethod.GET, "/api/v1/comments/**").permitAll()
+                    // 검색엔진용 sitemap (비인증 허용)
+                    .requestMatchers(HttpMethod.GET, "/sitemap.xml").permitAll()
                 .anyRequest().authenticated()
             ).sessionManagement(session -> session
                 .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
