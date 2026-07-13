@@ -29,6 +29,9 @@ import server.nadeliv.blog.model.DocumentView;
 import server.nadeliv.blog.model.Documents;
 import server.nadeliv.blog.repo.BlogsRepo;
 import server.nadeliv.blog.service.BlogService;
+import server.nadeliv.common.service.RateLimitService;
+import server.nadeliv.error.CustomException;
+import server.nadeliv.error.ErrorCode;
 import server.nadeliv.connections.bookmarks.repo.BookmarksRepo;
 import server.nadeliv.connections.follows.service.UserFollowService;
 import server.nadeliv.i18n.model.entities.PostTranslation;
@@ -77,10 +80,17 @@ public class BlogServiceImpl implements BlogService {
     @Autowired
     private UserFollowService userFollowService;
 
+    @Autowired
+    private RateLimitService rateLimitService;
+
     private final ObjectMapper popularObjectMapper = new ObjectMapper();
 
     private static final String POPULAR_CACHE_PREFIX = "blog:popular:";
     private static final Duration POPULAR_CACHE_TTL = Duration.ofMinutes(15);
+
+    // 하루 발행(draft→published 전환) 가능 글 수 제한 (남용 방지)
+    private static final String SCOPE_BLOG_PUBLISH = "blog:publish";
+    private static final int MAX_DAILY_PUBLISH = 8;
 
     private void testAggregationSteps(
             AggregationOperation matchDraft,
@@ -254,11 +264,23 @@ public class BlogServiceImpl implements BlogService {
             String username = userDetails.getUsername();
             documents.setCreatedUser(username);
             documents.setUpdatedUser(username);
+
+            // 남용 방지: 일반 플로우는 draft=true 로 생성하지만, 프론트를 우회해
+            // 바로 발행(draft=false)으로 생성하는 경우도 하루 8개 제한에 포함시킨다.
+            boolean isDirectPublish = !documents.isDraft();
+            if (isDirectPublish && rateLimitService.isDailyLimitReached(SCOPE_BLOG_PUBLISH, username, MAX_DAILY_PUBLISH)) {
+                throw new CustomException(ErrorCode.BLOG_PUBLISH_LIMIT_EXCEEDED);
+            }
+
             if (documents.getFolderId() == null) {
                 Users users = usersRepo.findByUserId(username);
                 documents.setFolderId(users.getId());
             }
             Documents afterDocument = blogsRepo.save(documents);
+
+            if (isDirectPublish) {
+                rateLimitService.incrementDaily(SCOPE_BLOG_PUBLISH, username);
+            }
 
             DocumentsDTO newDocDTO = new DocumentsDTO();
             BeanUtils.copyProperties(afterDocument, newDocDTO);
@@ -301,11 +323,23 @@ public class BlogServiceImpl implements BlogService {
                 documents.setDeletedAt(existing.getDeletedAt());
             }
 
+            // 남용 방지: 새로 발행되는 경우(draft→published 전환)만 하루 8개 제한.
+            // 이미 발행된 글을 다시 저장/수정하는 것은 카운트하지 않는다.
+            boolean isNewPublish = !documents.isDraft() && (existing == null || existing.isDraft());
+            if (isNewPublish && rateLimitService.isDailyLimitReached(SCOPE_BLOG_PUBLISH, username, MAX_DAILY_PUBLISH)) {
+                throw new CustomException(ErrorCode.BLOG_PUBLISH_LIMIT_EXCEEDED);
+            }
+
             if (documents.getFolderId() == null) {
                 Users users = usersRepo.findByUserId(username);
                 documents.setFolderId(users.getId());
             }
             Documents afterDocument = blogsRepo.save(documents);
+
+            // 발행 성공 후에만 카운트 증가 (실패한 저장은 쿼터 소모 안 함)
+            if (isNewPublish) {
+                rateLimitService.incrementDaily(SCOPE_BLOG_PUBLISH, username);
+            }
 
             // i18n: 발행된 글(draft가 아닌)이면 자동 번역 큐잉
             if (!afterDocument.isDraft()) {

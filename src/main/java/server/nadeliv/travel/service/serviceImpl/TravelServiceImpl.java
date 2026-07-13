@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import software.amazon.awssdk.core.ResponseInputStream;
 import software.amazon.awssdk.services.s3.model.GetObjectResponse;
+import server.nadeliv.common.service.RateLimitService;
 import server.nadeliv.error.CustomException;
 import server.nadeliv.error.ErrorCode;
 import server.nadeliv.travel.model.dto.*;
@@ -48,6 +49,11 @@ public class TravelServiceImpl implements TravelService {
     private final TravelMapper travelMapper;
     private final S3Service s3Service;
     private final TravelChannelRepo travelChannelRepo;
+    private final RateLimitService rateLimitService;
+
+    // 하루 업로드 가능한 파일 수 제한 (남용 방지)
+    private static final String SCOPE_TRAVEL_UPLOAD = "travel:upload";
+    private static final int MAX_DAILY_UPLOAD = 500;
 
     // ==================== Travel CRUD ====================
 
@@ -359,6 +365,11 @@ public class TravelServiceImpl implements TravelService {
         findTravelById(travelId);
         validateEditPermission(travelId, userId);
 
+        // 남용 방지: 사용자당 하루 업로드 500개 제한. S3 업로드 전에 검사해 불필요한 부하를 막는다.
+        if (rateLimitService.isDailyLimitReached(SCOPE_TRAVEL_UPLOAD, userId, MAX_DAILY_UPLOAD)) {
+            throw new CustomException(ErrorCode.TRAVEL_UPLOAD_LIMIT_EXCEEDED);
+        }
+
         String fileUrl = s3Service.uploadFile(file, travelId);
         String thumbnailUrl = s3Service.buildThumbnailUrl(fileUrl);
 
@@ -382,7 +393,12 @@ public class TravelServiceImpl implements TravelService {
         media.setCreatedUser(userId);
         media.setUpdatedUser(userId);
 
-        return travelMediaRepo.save(media);
+        TravelMedia saved = travelMediaRepo.save(media);
+
+        // 업로드 성공 후에만 카운트 증가 (S3/DB 실패는 쿼터 소모 안 함)
+        rateLimitService.incrementDaily(SCOPE_TRAVEL_UPLOAD, userId);
+
+        return saved;
     }
 
     @Override

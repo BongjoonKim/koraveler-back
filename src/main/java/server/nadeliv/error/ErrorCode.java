@@ -89,6 +89,10 @@ public enum ErrorCode {
     S3_DOWNLOAD_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "TRV_014", "파일 다운로드에 실패했습니다"),
     TRAVEL_CHANNEL_NOT_FOUND(HttpStatus.NOT_FOUND, "TRV_015", "여행 채널을 찾을 수 없습니다"),
     CHANNEL_ALREADY_LINKED(HttpStatus.CONFLICT, "TRV_016", "이미 연결된 채널입니다"),
+    TRAVEL_UPLOAD_LIMIT_EXCEEDED(HttpStatus.TOO_MANY_REQUESTS, "TRV_017", "하루 업로드 가능한 파일 수(500개)를 초과했습니다"),
+
+    // ============= 블로그 에러 (BLOG) =============
+    BLOG_PUBLISH_LIMIT_EXCEEDED(HttpStatus.TOO_MANY_REQUESTS, "BLOG_001", "하루 발행 가능한 글 수(8개)를 초과했습니다"),
 
     // ============= 파일 에러 (FILE) =============
     INVALID_FILE_KEY(HttpStatus.BAD_REQUEST, "FILE_001", "허용되지 않은 파일 경로입니다"),
