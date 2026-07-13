@@ -17,6 +17,7 @@ import server.nadeliv.blog.dto.PaginationDTO;
 import server.nadeliv.blog.dto.PopularPostDTO;
 import server.nadeliv.blog.model.Documents;
 import server.nadeliv.blog.service.BlogService;
+import server.nadeliv.error.CustomException;
 
 import java.util.HashMap;
 import java.util.List;
@@ -38,6 +39,8 @@ public class BlogController {
         try {
             DocumentsDTO documentsDTO = blogService.createDocument(data);
             return ResponseEntity.ok(documentsDTO);
+        } catch (CustomException e) {
+            throw e; // 발행 한도 초과(429) 등은 GlobalExceptionHandler로 전달
         } catch (Exception e) {
             return null;
         }
@@ -64,6 +67,8 @@ public class BlogController {
         try {
             DocumentsDTO documentsDTO = blogService.saveDocument(data);
             return ResponseEntity.ok(documentsDTO);
+        } catch (CustomException e) {
+            throw e; // 발행 한도 초과(429) 등은 GlobalExceptionHandler로 전달
         } catch (ResponseStatusException e) {
             throw e;
         } catch (Exception e) {
