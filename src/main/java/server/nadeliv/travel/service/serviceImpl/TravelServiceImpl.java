@@ -287,6 +287,28 @@ public class TravelServiceImpl implements TravelService {
         return travelMapper.toResponse(travel, members);
     }
 
+    // ==================== Visited Regions (Korea Map) ====================
+
+    @Override
+    public TravelResponse updateVisitedRegions(String travelId, TravelRegionsRequest request, String userId) {
+        Travels travel = findTravelById(travelId);
+        validateEditPermission(travelId, userId);
+
+        // 행정코드 형식(숫자 2~5자리)만 허용하고 중복 제거 후 전체 교체
+        List<String> codes = request.getRegionCodes().stream()
+                .filter(code -> code != null && code.matches("\\d{2,5}"))
+                .distinct()
+                .toList();
+
+        travel.setVisitedRegionCodes(new ArrayList<>(codes));
+        travel.setUpdated(LocalDateTime.now());
+        travel.setUpdatedUser(userId);
+        Travels updatedTravel = travelsRepo.save(travel);
+
+        List<TravelUsers> members = travelUsersRepo.findByTravelId(travelId);
+        return travelMapper.toResponse(updatedTravel, members);
+    }
+
     // ==================== Schedule Management ====================
 
     @Override

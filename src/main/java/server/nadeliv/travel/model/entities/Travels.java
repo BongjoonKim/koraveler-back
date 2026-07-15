@@ -40,4 +40,8 @@ public class Travels extends CommonDTO {
 
     @Builder.Default
     private List<String> channelIds = new ArrayList<>();
+
+    // 방문한 시/군 행정코드 목록 (Korea Map 플러그인)
+    @Builder.Default
+    private List<String> visitedRegionCodes = new ArrayList<>();
 }

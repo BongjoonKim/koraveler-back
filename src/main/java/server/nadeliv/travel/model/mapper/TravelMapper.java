@@ -55,6 +55,7 @@ public class TravelMapper {
                 .tags(travel.getTags())
                 .schedules(travel.getSchedules())
                 .channelIds(travel.getChannelIds())
+                .visitedRegionCodes(travel.getVisitedRegionCodes())
                 .members(memberResponses)
                 .memberCount(memberResponses.size())
                 .createdUser(travel.getCreatedUser())

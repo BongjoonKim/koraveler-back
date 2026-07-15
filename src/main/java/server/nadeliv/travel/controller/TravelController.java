@@ -112,6 +112,17 @@ public class TravelController {
         return ResponseEntity.ok(response);
     }
 
+    // ==================== Visited Regions (Korea Map) ====================
+
+    @PutMapping("/{travelId}/regions")
+    public ResponseEntity<TravelResponse> updateVisitedRegions(
+            @PathVariable String travelId,
+            @Valid @RequestBody TravelRegionsRequest request,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        TravelResponse response = travelService.updateVisitedRegions(travelId, request, userDetails.getUsername());
+        return ResponseEntity.ok(response);
+    }
+
     // ==================== Schedule Management ====================
 
     @PostMapping("/{travelId}/schedules")

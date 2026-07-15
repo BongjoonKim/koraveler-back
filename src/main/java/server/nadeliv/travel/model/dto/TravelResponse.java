@@ -29,6 +29,7 @@ public class TravelResponse {
     private List<String> tags;
     private List<TravelSchedule> schedules;
     private List<String> channelIds;
+    private List<String> visitedRegionCodes;
     private List<TravelMemberResponse> members;
     private Integer memberCount;
     private String createdUser;
