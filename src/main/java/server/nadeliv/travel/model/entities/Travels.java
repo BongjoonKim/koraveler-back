@@ -8,6 +8,7 @@ import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 import server.nadeliv.common.dto.CommonDTO;
 import server.nadeliv.travel.model.embedded.TravelSchedule;
+import server.nadeliv.travel.model.embedded.VisitedPlace;
 import server.nadeliv.travel.model.enums.TravelStatus;
 import server.nadeliv.travel.model.enums.TravelVisibility;
 
@@ -44,4 +45,8 @@ public class Travels extends CommonDTO {
     // 방문한 시/군 행정코드 목록 (Korea Map 플러그인)
     @Builder.Default
     private List<String> visitedRegionCodes = new ArrayList<>();
+
+    // 다녀온 장소 목록 (Korea Map 플러그인 — 순서·시간 미기록)
+    @Builder.Default
+    private List<VisitedPlace> visitedPlaces = new ArrayList<>();
 }
