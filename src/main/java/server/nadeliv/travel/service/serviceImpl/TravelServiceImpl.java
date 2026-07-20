@@ -16,6 +16,7 @@ import server.nadeliv.error.CustomException;
 import server.nadeliv.error.ErrorCode;
 import server.nadeliv.travel.model.dto.*;
 import server.nadeliv.travel.model.embedded.TravelSchedule;
+import server.nadeliv.travel.model.embedded.VisitedPlace;
 import server.nadeliv.travel.model.entities.TravelMedia;
 import server.nadeliv.travel.model.entities.TravelUsers;
 import server.nadeliv.travel.model.entities.Travels;
@@ -33,7 +34,9 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
@@ -285,6 +288,51 @@ public class TravelServiceImpl implements TravelService {
 
         List<TravelUsers> members = travelUsersRepo.findByTravelId(travelId);
         return travelMapper.toResponse(travel, members);
+    }
+
+    // ==================== Visited Regions (Korea Map) ====================
+
+    @Override
+    public TravelResponse updateVisitedRegions(String travelId, TravelRegionsRequest request, String userId) {
+        Travels travel = findTravelById(travelId);
+        validateEditPermission(travelId, userId);
+
+        // 행정코드 형식(숫자 2~5자리)만 허용하고 중복 제거 후 전체 교체
+        List<String> codes = request.getRegionCodes().stream()
+                .filter(code -> code != null && code.matches("\\d{2,5}"))
+                .distinct()
+                .toList();
+
+        travel.setVisitedRegionCodes(new ArrayList<>(codes));
+        travel.setUpdated(LocalDateTime.now());
+        travel.setUpdatedUser(userId);
+        Travels updatedTravel = travelsRepo.save(travel);
+
+        List<TravelUsers> members = travelUsersRepo.findByTravelId(travelId);
+        return travelMapper.toResponse(updatedTravel, members);
+    }
+
+    @Override
+    public TravelResponse updateVisitedPlaces(String travelId, TravelPlacesRequest request, String userId) {
+        Travels travel = findTravelById(travelId);
+        validateEditPermission(travelId, userId);
+
+        // 이름·좌표 없는 항목 제외, 장소 ID 기준 중복 제거 후 전체 교체
+        Set<String> seenIds = new HashSet<>();
+        List<VisitedPlace> places = request.getPlaces().stream()
+                .filter(p -> p != null && p.getName() != null && !p.getName().isBlank()
+                        && p.getLat() != null && p.getLng() != null)
+                .filter(p -> p.getId() == null || seenIds.add(p.getId()))
+                .filter(p -> p.getRegionCode() == null || p.getRegionCode().matches("\\d{2,5}"))
+                .toList();
+
+        travel.setVisitedPlaces(new ArrayList<>(places));
+        travel.setUpdated(LocalDateTime.now());
+        travel.setUpdatedUser(userId);
+        Travels updatedTravel = travelsRepo.save(travel);
+
+        List<TravelUsers> members = travelUsersRepo.findByTravelId(travelId);
+        return travelMapper.toResponse(updatedTravel, members);
     }
 
     // ==================== Schedule Management ====================

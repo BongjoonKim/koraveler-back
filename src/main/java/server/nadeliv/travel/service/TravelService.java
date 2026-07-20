@@ -25,6 +25,11 @@ public interface TravelService {
     void removeMember(String travelId, String targetUserId, String userId);
     TravelResponse updateMemberRole(String travelId, String targetUserId, TravelRole role, String userId);
 
+    // Visited Regions (Korea Map)
+    TravelResponse updateVisitedRegions(String travelId, TravelRegionsRequest request, String userId);
+
+    TravelResponse updateVisitedPlaces(String travelId, TravelPlacesRequest request, String userId);
+
     // Schedule Management
     TravelResponse addSchedule(String travelId, TravelScheduleRequest request, String userId);
     TravelResponse updateSchedule(String travelId, String scheduleId, TravelScheduleRequest request, String userId);
