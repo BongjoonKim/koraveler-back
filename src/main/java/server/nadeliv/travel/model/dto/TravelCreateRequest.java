@@ -6,6 +6,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import server.nadeliv.travel.model.embedded.DashboardItem;
 import server.nadeliv.travel.model.enums.TravelVisibility;
 
 import java.time.LocalDate;
@@ -30,4 +31,7 @@ public class TravelCreateRequest {
     private LocalDate endDate;
     private String destination;
     private List<String> tags;
+
+    // 생성 시 적용할 대시보드 기본 구성 (미지정 시 null → 프론트 기본값)
+    private List<DashboardItem> dashboardItems;
 }

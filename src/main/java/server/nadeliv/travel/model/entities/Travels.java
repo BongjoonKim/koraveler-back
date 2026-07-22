@@ -7,6 +7,7 @@ import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 import server.nadeliv.common.dto.CommonDTO;
+import server.nadeliv.travel.model.embedded.DashboardItem;
 import server.nadeliv.travel.model.embedded.TravelSchedule;
 import server.nadeliv.travel.model.embedded.VisitedPlace;
 import server.nadeliv.travel.model.enums.TravelStatus;
@@ -49,4 +50,7 @@ public class Travels extends CommonDTO {
     // 다녀온 장소 목록 (Korea Map 플러그인 — 순서·시간 미기록)
     @Builder.Default
     private List<VisitedPlace> visitedPlaces = new ArrayList<>();
+
+    // 대시보드 표시 항목 구성. null 이면 프론트 기본 구성 사용 (빈 배열과 구분되므로 @Builder.Default 금지)
+    private List<DashboardItem> dashboardItems;
 }

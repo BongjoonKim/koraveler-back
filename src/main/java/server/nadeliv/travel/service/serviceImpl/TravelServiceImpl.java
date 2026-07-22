@@ -115,6 +115,7 @@ public class TravelServiceImpl implements TravelService {
         if (request.getEndDate() != null) travel.setEndDate(request.getEndDate());
         if (request.getDestination() != null) travel.setDestination(request.getDestination());
         if (request.getTags() != null) travel.setTags(request.getTags());
+        if (request.getDashboardItems() != null) travel.setDashboardItems(request.getDashboardItems());
 
         if (travel.getStartDate() != null && travel.getEndDate() != null
                 && travel.getStartDate().isAfter(travel.getEndDate())) {

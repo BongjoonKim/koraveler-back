@@ -5,6 +5,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import server.nadeliv.travel.model.embedded.DashboardItem;
 import server.nadeliv.travel.model.enums.TravelStatus;
 import server.nadeliv.travel.model.enums.TravelVisibility;
 
@@ -30,4 +31,5 @@ public class TravelUpdateRequest {
     private LocalDate endDate;
     private String destination;
     private List<String> tags;
+    private List<DashboardItem> dashboardItems;
 }

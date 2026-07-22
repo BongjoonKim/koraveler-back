@@ -29,6 +29,7 @@ public class TravelMapper {
                 .tags(request.getTags() != null ? request.getTags() : new ArrayList<>())
                 .schedules(new ArrayList<>())
                 .channelIds(new ArrayList<>())
+                .dashboardItems(request.getDashboardItems())
                 .build();
         travel.setCreated(LocalDateTime.now());
         travel.setUpdated(LocalDateTime.now());
@@ -57,6 +58,7 @@ public class TravelMapper {
                 .channelIds(travel.getChannelIds())
                 .visitedRegionCodes(travel.getVisitedRegionCodes())
                 .visitedPlaces(travel.getVisitedPlaces())
+                .dashboardItems(travel.getDashboardItems())
                 .members(memberResponses)
                 .memberCount(memberResponses.size())
                 .createdUser(travel.getCreatedUser())
