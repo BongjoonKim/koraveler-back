@@ -4,6 +4,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import server.nadeliv.travel.model.embedded.DashboardItem;
 import server.nadeliv.travel.model.embedded.TravelSchedule;
 import server.nadeliv.travel.model.embedded.VisitedPlace;
 import server.nadeliv.travel.model.enums.TravelStatus;
@@ -32,6 +33,7 @@ public class TravelResponse {
     private List<String> channelIds;
     private List<String> visitedRegionCodes;
     private List<VisitedPlace> visitedPlaces;
+    private List<DashboardItem> dashboardItems;
     private List<TravelMemberResponse> members;
     private Integer memberCount;
     private String createdUser;

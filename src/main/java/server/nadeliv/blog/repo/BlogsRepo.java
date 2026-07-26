@@ -71,6 +71,11 @@ public interface BlogsRepo extends MongoRepository<Documents, String> {
     // Featured 설정된 모든 글 (히스토리용)
     Page<Documents> findByFeaturedReadyTrueAndIsDeletedFalse(Pageable pageable);
 
+    // 관리자용: 특정 사용자가 작성한 글 (draft·휴지통 포함, 상태는 프론트에서 뱃지로 표시)
+    Page<Documents> findByCreatedUser(String createdUser, Pageable pageable);
+
+    long countByCreatedUser(String createdUser);
+
     // sitemap.xml 용: 발행·공개 글만, 필요한 필드만 프로젝션
     @Query(value = "{ 'draft': { $ne: true }, 'isDeleted': { $ne: true }, 'disclose': { $ne: false } }",
             fields = "{ '_id': 1, 'updated': 1, 'created': 1, 'originalLocale': 1 }")
