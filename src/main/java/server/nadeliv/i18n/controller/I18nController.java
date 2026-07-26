@@ -187,4 +187,25 @@ public class I18nController {
                     .body("Batch translation failed: " + e.getMessage());
         }
     }
+
+    /**
+     * 깨진 번역(잘린 모델 응답이 그대로 저장된 건) 탐지 후 재번역 큐잉.
+     */
+    @PostMapping("/admin/repair-broken-translations")
+    public ResponseEntity<?> repairBrokenTranslations(
+            @AuthenticationPrincipal CustomUserDetails userDetails
+    ) {
+        try {
+            int queuedCount = i18nTranslationService.repairBrokenTranslations();
+            return ResponseEntity.accepted()
+                    .body(java.util.Map.of(
+                            "message", "Broken translations re-queued",
+                            "queuedTranslations", queuedCount
+                    ));
+        } catch (Exception e) {
+            log.error("깨진 번역 복구 실패", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Repair failed: " + e.getMessage());
+        }
+    }
 }
