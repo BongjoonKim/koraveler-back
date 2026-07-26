@@ -446,6 +446,51 @@ public class I18nTranslationServiceImpl implements I18nTranslationService {
         return queued;
     }
 
+    @Override
+    public int repairBrokenTranslations() {
+        // 깨진 번역 = 파싱 실패로 모델 원문 응답(JSON 통째)이 content로 저장됐거나
+        // 플레이스홀더가 복원되지 않은 채 남아 있는 COMPLETED 번역
+        List<PostTranslation> completed = postTranslationRepo.findByStatus(TranslationStatus.COMPLETED);
+        LocalDateTime now = LocalDateTime.now();
+        int queued = 0;
+
+        for (PostTranslation t : completed) {
+            if (!isBrokenContent(t.getContent())) continue;
+
+            log.info("깨진 번역 감지 → 재큐잉: postId={}, locale={}", t.getPostId(), t.getLocale());
+
+            t.setStatus(TranslationStatus.PENDING);
+            t.setUpdatedAt(now);
+            postTranslationRepo.save(t);
+
+            Optional<TranslationJob> activeJob = translationJobRepo
+                    .findByPostIdAndTargetLocaleAndStatusIn(
+                            t.getPostId(), t.getLocale(),
+                            List.of(JobStatus.QUEUED, JobStatus.PROCESSING));
+            if (activeJob.isEmpty()) {
+                translationJobRepo.save(TranslationJob.builder()
+                        .postId(t.getPostId())
+                        .targetLocale(t.getLocale())
+                        .status(JobStatus.QUEUED)
+                        .createdAt(now)
+                        .build());
+            }
+            queued++;
+        }
+
+        log.info("깨진 번역 복구 큐잉 완료: {} 건", queued);
+        return queued;
+    }
+
+    // 깨진 번역 판별: content가 모델 JSON 응답 원문이거나 미복원 플레이스홀더 포함
+    private boolean isBrokenContent(String content) {
+        if (content == null) return false;
+        String trimmed = content.strip();
+        boolean looksLikeRawJson = trimmed.startsWith("{")
+                && (trimmed.contains("\"title\"") || trimmed.contains("\"content\""));
+        return looksLikeRawJson || content.contains("[[PH");
+    }
+
     // availableLocales 빌드 헬퍼
     private List<AvailableLocaleDTO> buildAvailableLocales(String originalLocale,
                                                             List<PostTranslation> translations) {

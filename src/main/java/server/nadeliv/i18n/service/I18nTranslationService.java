@@ -38,4 +38,7 @@ public interface I18nTranslationService {
 
     // 관리자용: 기존 글 일괄 번역 큐잉
     int queueAllExistingPosts();
+
+    // 관리자용: 깨진 번역(잘린 JSON 원문 저장분) 탐지 후 재번역 큐잉
+    int repairBrokenTranslations();
 }

@@ -22,6 +22,9 @@ public interface PostTranslationRepo extends MongoRepository<PostTranslation, St
     // sitemap.xml 용: 번역 완료된 모든 문서 조회
     List<PostTranslation> findByStatus(TranslationStatus status);
 
+    // sitemap.xml 용: 완료(COMPLETED) + 수동편집(MANUALLY_EDITED) 번역 일괄 조회
+    List<PostTranslation> findByStatusIn(List<TranslationStatus> statuses);
+
     void deleteByPostId(String postId);
 
     // 여러 문서의 번역을 한번에 조회 (블로그 목록용)
